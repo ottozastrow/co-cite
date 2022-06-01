@@ -5,7 +5,7 @@ from transformers import BertTokenizer, BertModel
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-filename = "../data_raw_bva/supreme_court_opinions/20220419_lexis_opinions_filtered_op_length_mini.csv"
+filename = "../external_projects/data_raw_bva/supreme_court_opinions/20220419_lexis_opinions_filtered_op_length_mini.csv"
 
 # read csv into dataframe
 df = pd.read_csv(filename)
