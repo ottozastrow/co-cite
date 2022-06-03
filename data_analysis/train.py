@@ -158,17 +158,17 @@ if __name__ == "__main__":
         results["accuracy"] = np.mean(sample_wise_acc)
         
         # sample outputs
-        sample_outputs = tokenizer.batch_decode(
-            predictions, 
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=True)
-        # outputs = [output.replace("@cit@", "") for output in outputs]
-        sample_labels = tokenizer.batch_decode(
-            labels, 
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=True)
+        # sample_outputs = tokenizer.batch_decode(
+        #     predictions, 
+        #     skip_special_tokens=True,
+        #     clean_up_tokenization_spaces=True)
+        # # outputs = [output.replace("@cit@", "") for output in outputs]
+        # sample_labels = tokenizer.batch_decode(
+        #     labels, 
+        #     skip_special_tokens=True,
+        #     clean_up_tokenization_spaces=True)
 
-        results["samples"] = list(zip(sample_outputs, sample_labels))
+        # results["samples"] = list(zip(sample_outputs, sample_labels))
         
         return results
 
