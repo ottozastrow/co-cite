@@ -2,13 +2,6 @@ import argparse
 import os
 import pandas as pd
 import tqdm
-import subprocess
-
-# execute bash command from python
-try:    
-    subprocess.call(["module", "load", "eth_proxy"])
-except:
-    print("couldn't load eth proxy")
 
 import numpy as np
 from transformers import AutoModelForSeq2SeqLM, Seq2SeqTrainingArguments, Seq2SeqTrainer, \
