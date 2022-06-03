@@ -15,7 +15,7 @@ parser.add_argument("--modelname", help="name on huggingface model hub", default
 parser.add_argument("--epochs", type=int, help="number of epochs", default=20)
 parser.add_argument("--batchsize", type=int, help="batch size", default=16)
 parser.add_argument("--contextlength", type=int, help="context length", default=300)
-parser.add_argument("--miniaturedataset", type=bool, 
+parser.add_argument("--miniaturedataset", 
                     help="for debugging only use 20 samples", action="store_true")
 
 args = parser.parse_args()
