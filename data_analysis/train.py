@@ -15,8 +15,11 @@ parser.add_argument("--modelname", help="name on huggingface model hub", default
 parser.add_argument("--epochs", type=int, help="number of epochs", default=20)
 parser.add_argument("--batchsize", type=int, help="batch size", default=16)
 parser.add_argument("--contextlength", type=int, help="context length", default=300)
-parser.add_argument("--miniaturedataset", 
+parser.add_argument("--miniature_dataset", 
                     help="for debugging only use 20 samples", action="store_true")
+# miniature_ddataset_size argument
+parser.add_argument("--miniature_dataset_size", type=int, help="context length", default=10000)
+
 
 args = parser.parse_args()
 
@@ -37,8 +40,8 @@ def load_ds(data_dir):
 
     dfs = [] # an empty list to store the data frames
 
-    if args.miniaturedataset:
-        filepaths = filepaths[:20]
+    if args.miniature_dataset:
+        filepaths = filepaths[:args.miniature_dataset_size]
     
     for file in tqdm.tqdm(filepaths):
         data = pd.read_json(file, lines=True) # read data frame from json file
@@ -134,6 +137,7 @@ if __name__ == "__main__":
         output_dir="./results",
         evaluation_strategy="epoch",
         learning_rate=2e-5,
+        eval_accumulation_steps=1,
         per_device_train_batch_size=args.batchsize,
         per_device_eval_batch_size=args.batchsize,
         weight_decay=0.01,
@@ -143,12 +147,13 @@ if __name__ == "__main__":
     )
     # predictions = trainer.predict(tokenized_datasets["test"])
     metric_bleu = load_metric("bleu")
-
+    import pdb
     def compute_metrics(eval_preds):
         logits, labels = eval_preds
+    
         predictions = np.argmax(logits[0], axis=-1)
         results = metric_bleu.compute(predictions=[predictions], references=[labels])
-
+        # pdb.set_trace()
         # sequence level accuracy
         # first element wise comparison, if there is a single false value, then the whole sequence is wrong
         sample_wise_acc = np.equal(predictions, labels).all(axis=1)
