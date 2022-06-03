@@ -146,28 +146,28 @@ if __name__ == "__main__":
 
     def compute_metrics(eval_preds):
         logits, labels = eval_preds
-        # predictions = np.argmax(logits[0], axis=-1)
-        # results = metric_bleu.compute(predictions=[predictions], references=[labels])
+        predictions = np.argmax(logits[0], axis=-1)
+        results = metric_bleu.compute(predictions=[predictions], references=[labels])
 
-        # # sequence level accuracy
-        # # first element wise comparison, if there is a single false value, then the whole sequence is wrong
-        # sample_wise_acc = np.equal(predictions, labels).all(axis=1)
-        # results["accuracy"] = np.mean(sample_wise_acc)
+        # sequence level accuracy
+        # first element wise comparison, if there is a single false value, then the whole sequence is wrong
+        sample_wise_acc = np.equal(predictions, labels).all(axis=1)
+        results["accuracy"] = np.mean(sample_wise_acc)
         
         # sample outputs
-        # sample_outputs = tokenizer.batch_decode(
-        #     predictions, 
-        #     skip_special_tokens=True,
-        #     clean_up_tokenization_spaces=True)
-        # # outputs = [output.replace("@cit@", "") for output in outputs]
-        # sample_labels = tokenizer.batch_decode(
-        #     labels, 
-        #     skip_special_tokens=True,
-        #     clean_up_tokenization_spaces=True)
+        sample_outputs = tokenizer.batch_decode(
+            predictions, 
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True)
+        # outputs = [output.replace("@cit@", "") for output in outputs]
+        sample_labels = tokenizer.batch_decode(
+            labels, 
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True)
 
-        # results["samples"] = list(zip(sample_outputs, sample_labels))
+        results["samples"] = list(zip(sample_outputs, sample_labels))
         
-        return {'accuracy': 0.0}
+        return results
 
     trainer = Seq2SeqTrainer(
         model=model,
