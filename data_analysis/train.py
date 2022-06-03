@@ -135,9 +135,9 @@ if __name__ == "__main__":
 
     training_args = Seq2SeqTrainingArguments(
         output_dir="./results",
-        evaluation_strategy="epoch",
+        evaluation_strategy="steps",
         learning_rate=2e-5,
-        eval_accumulation_steps=1,
+        eval_accumulation_steps=8,
         per_device_train_batch_size=args.batchsize,
         per_device_eval_batch_size=args.batchsize,
         weight_decay=0.01,
