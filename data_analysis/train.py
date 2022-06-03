@@ -11,7 +11,7 @@ from datasets import Dataset, load_metric
 
 # add argument parser
 parser = argparse.ArgumentParser()
-parser.add_argument("--modelname", help="name on huggingface model hub", default="distilbert-base-uncased")
+parser.add_argument("--modelname", help="name on huggingface model hub", default="t5-small")
 args = parser.parse_args()
 
 
@@ -30,7 +30,7 @@ def load_ds(data_dir):
     filepaths = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith('.json')]
 
     dfs = [] # an empty list to store the data frames
-    for file in tqdm.tqdm(filepaths[:20]):
+    for file in tqdm.tqdm(filepaths[:10]):
         data = pd.read_json(file, lines=True) # read data frame from json file
         dfs.append(data) # append the data frame to the list
 
@@ -57,7 +57,7 @@ def get_citation_context(x):
     """Extract inputs and targets from a dataframe row"""
     inputs = []
     targets = []
-    contextlength = 200
+    contextlength = 300
     indexes = find_all_indexes(x['txt'], "@cit@")  # TODO replace compuationally iniefficient method
     
     for i in range(len(x['citation_vocab'])):
@@ -130,14 +130,38 @@ if __name__ == "__main__":
         per_device_eval_batch_size=16,
         weight_decay=0.01,
         save_total_limit=3,
-        num_train_epochs=1,
+        num_train_epochs=10,
         fp16=False,
     )
-    metric = load_metric("bleu")
-    def compute_metrics(eval_pred):
-        logits, labels = eval_pred
-        predictions = np.argmax(logits, axis=-1)
-        return metric.compute(predictions=predictions, references=labels)
+    # predictions = trainer.predict(tokenized_datasets["test"])
+    metric_bleu = load_metric("bleu")
+    metric_acc = load_metric("accuracy")
+
+    def compute_metrics(eval_preds):
+        logits, labels = eval_preds
+        predictions = np.argmax(logits[0], axis=-1)
+        results = metric_bleu.compute(predictions=[predictions], references=[labels])
+
+        # sequence level accuracy
+        # first element wise comparison, if there is a single false value, then the whole sequence is wrong
+        sample_wise_acc = np.equal(predictions, labels).all(axis=1)
+        results["accuracy"] = np.mean(sample_wise_acc)
+        
+        # sample outputs
+        sample_outputs = tokenizer.batch_decode(
+            predictions, 
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True)
+        # outputs = [output.replace("@cit@", "") for output in outputs]
+        sample_labels = tokenizer.batch_decode(
+            predictions, 
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True)
+        # sample_inputs = tokenizer.batch_decode(
+        #     model_inputs
+        pdb.set_trace()
+        
+        return results
 
     acc_metric = load_metric('accuracy')
     trainer = Seq2SeqTrainer(
@@ -147,10 +171,14 @@ if __name__ == "__main__":
         eval_dataset=tokenized_datasets["test"],
         tokenizer=tokenizer,
         data_collator=data_collator,
-        compute_metrics=compute_metrics,
+        compute_metrics=compute_metrics
     )
     trainer.train()
 
+    # predictions = trainer.predict(tokenized_datasets["test"])
+
+
+    # print(model(tokenized_datasets['test']))
 
     # tf_train_set = tokenized_datasets["train"].to_tf_dataset(
     #     columns=["attention_mask", "input_ids", "labels"],
