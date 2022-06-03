@@ -1,11 +1,11 @@
-# use huggingface transformers to create embedding for each citation
+import logging
 from transformers import BertTokenizer, BertModel
 
 # get data
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-filename = "../external_projects/data_raw_bva/supreme_court_opinions/20220419_lexis_opinions_filtered_op_length_mini.csv"
+filename = "../../external_projects/data_raw_bva/supreme_court_opinions/20220419_lexis_opinions_filtered_op_length_mini.csv"
 
 # read csv into dataframe
 df = pd.read_csv(filename)
@@ -44,9 +44,10 @@ def get_embedding(citations):
 
 # df['embeddings'] = df["citations_raw"].apply(get_embedding)
 embeddings = []
-for i in range(50):
+for i in range(len(df)):
     embed = get_embedding(df['citations_raw'].loc[i])
     embeddings.append(embed)
+    print(embed)
 
-import pdb
-pdb.set_trace()
+print(embeddings)
+logging.info(embeddings)
