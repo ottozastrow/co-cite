@@ -12,6 +12,12 @@ from datasets import Dataset, load_metric
 # add argument parser
 parser = argparse.ArgumentParser()
 parser.add_argument("--modelname", help="name on huggingface model hub", default="t5-small")
+parser.add_argument("--epochs", type=int, help="number of epochs", default=20)
+parser.add_argument("--batchsize", type=int, help="batch size", default=16)
+parser.add_argument("--contextlength", type=int, help="context length", default=300)
+parser.add_argument("--miniaturedataset", type=bool, 
+                    help="for debugging only use 20 samples", action="store_true")
+
 args = parser.parse_args()
 
 
@@ -30,7 +36,11 @@ def load_ds(data_dir):
     filepaths = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith('.json')]
 
     dfs = [] # an empty list to store the data frames
-    for file in tqdm.tqdm(filepaths[:10]):
+
+    if args.miniaturedataset:
+        filepaths = filepaths[:20]
+    
+    for file in tqdm.tqdm(filepaths):
         data = pd.read_json(file, lines=True) # read data frame from json file
         dfs.append(data) # append the data frame to the list
 
@@ -57,7 +67,7 @@ def get_citation_context(x):
     """Extract inputs and targets from a dataframe row"""
     inputs = []
     targets = []
-    contextlength = 300
+    contextlength = args.contextlength
     indexes = find_all_indexes(x['txt'], "@cit@")  # TODO replace compuationally iniefficient method
     
     for i in range(len(x['citation_vocab'])):
@@ -126,11 +136,11 @@ if __name__ == "__main__":
         output_dir="./results",
         evaluation_strategy="epoch",
         learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
+        per_device_train_batch_size=args.batchsize,
+        per_device_eval_batch_size=args.batchsize,
         weight_decay=0.01,
         save_total_limit=3,
-        num_train_epochs=10,
+        num_train_epochs=args.epochs,
         fp16=False,
     )
     # predictions = trainer.predict(tokenized_datasets["test"])
@@ -154,16 +164,14 @@ if __name__ == "__main__":
             clean_up_tokenization_spaces=True)
         # outputs = [output.replace("@cit@", "") for output in outputs]
         sample_labels = tokenizer.batch_decode(
-            predictions, 
+            labels, 
             skip_special_tokens=True,
             clean_up_tokenization_spaces=True)
-        # sample_inputs = tokenizer.batch_decode(
-        #     model_inputs
-        pdb.set_trace()
+
+        results["samples"] = list(zip(sample_outputs, sample_labels))
         
         return results
 
-    acc_metric = load_metric('accuracy')
     trainer = Seq2SeqTrainer(
         model=model,
         args=training_args,
@@ -171,31 +179,6 @@ if __name__ == "__main__":
         eval_dataset=tokenized_datasets["test"],
         tokenizer=tokenizer,
         data_collator=data_collator,
-        compute_metrics=compute_metrics
+        compute_metrics=compute_metrics,
     )
     trainer.train()
-
-    # predictions = trainer.predict(tokenized_datasets["test"])
-
-
-    # print(model(tokenized_datasets['test']))
-
-    # tf_train_set = tokenized_datasets["train"].to_tf_dataset(
-    #     columns=["attention_mask", "input_ids", "labels"],
-    #     shuffle=True,
-    #     batch_size=16,
-    #     collate_fn=data_collator,
-    # )
-
-    # tf_test_set = tokenized_datasets["test"].to_tf_dataset(
-    #     columns=["attention_mask", "input_ids", "labels"],
-    #     shuffle=False,
-    #     batch_size=16,
-    #     collate_fn=data_collator,
-    # )
-
-    # from transformers import create_optimizer, AdamWeightDecay
-    # import tensorflow as tf
-    # optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
-    # model.compile(optimizer=optimizer)
-    # model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=3, metrics=[tf.keras.metrics.Accuracy()]])
