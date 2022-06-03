@@ -62,7 +62,6 @@ def find_all_indexes(txt, substr):
     return indexes
     
 
-import pdb
 def get_citation_context(x):
     """Extract inputs and targets from a dataframe row"""
     inputs = []
@@ -98,7 +97,6 @@ def preprocess_data(df):
     df_pairs = pd.DataFrame(columns)
     dataset = Dataset.from_pandas(df_pairs)
     dataset = dataset.train_test_split(test_size=0.2)
-    print(len(dataset['train']), len(dataset['test']))
     return dataset
 
 
@@ -145,17 +143,16 @@ if __name__ == "__main__":
     )
     # predictions = trainer.predict(tokenized_datasets["test"])
     metric_bleu = load_metric("bleu")
-    metric_acc = load_metric("accuracy")
 
     def compute_metrics(eval_preds):
         logits, labels = eval_preds
-        predictions = np.argmax(logits[0], axis=-1)
-        results = metric_bleu.compute(predictions=[predictions], references=[labels])
+        # predictions = np.argmax(logits[0], axis=-1)
+        # results = metric_bleu.compute(predictions=[predictions], references=[labels])
 
-        # sequence level accuracy
-        # first element wise comparison, if there is a single false value, then the whole sequence is wrong
-        sample_wise_acc = np.equal(predictions, labels).all(axis=1)
-        results["accuracy"] = np.mean(sample_wise_acc)
+        # # sequence level accuracy
+        # # first element wise comparison, if there is a single false value, then the whole sequence is wrong
+        # sample_wise_acc = np.equal(predictions, labels).all(axis=1)
+        # results["accuracy"] = np.mean(sample_wise_acc)
         
         # sample outputs
         # sample_outputs = tokenizer.batch_decode(
@@ -170,7 +167,7 @@ if __name__ == "__main__":
 
         # results["samples"] = list(zip(sample_outputs, sample_labels))
         
-        return results
+        return {'accuracy': 0.0}
 
     trainer = Seq2SeqTrainer(
         model=model,
