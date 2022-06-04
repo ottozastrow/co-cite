@@ -64,33 +64,35 @@ rouge_metric = load_metric("rouge")
 def rouge_fn(data):
     inputs, labels = data
     predictions = model.generate(inputs)
-    try:
-        decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-        decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
-        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-    
-        ### Compute ROUGE
-        result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
-        results =  {key: value.mid.fmeasure * 100 for key, value in result.items()}
-        wandb.log({"rouge": results})
+    print("finished generating predictions")
 
-        ### accuracy
-        results['acc'] = np.mean([pred == label for pred, label in list(zip(decoded_predictions, decoded_labels))])
-        wandb.log({"accuracy": results['acc']})
+    decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    print("finished decoding predictions")
+    inputs = np.where(inputs != -100, labels, tokenizer.pad_token_id)
+    decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
+    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+    print("finished decoding labels")
 
-        ### sample outputs
-        my_table = wandb.Table(columns=["inputs", "prediction", "groundtruth"], 
-        data=[list(t) for t in zip(decoded_inputs, decoded_predictions, decoded_labels)])
-        wandb.log({"demo": my_table})
-        return results
+    ### Compute ROUGE
+    result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
+    results =  {key: value.mid.fmeasure * 100 for key, value in result.items()}
+    wandb.log({"rouge": results})
 
-    except:
-        min = np.min(inputs)
-        max = np.max(inputs)
-        print(f"min: {min} max: {max}")
-        print(inputs.shape)
-        wandb.log({"error":{"min": min, "max": max}})
-        return {"error": {"min": min, "max": max}}
+    ### accuracy
+    results['acc'] = np.mean([pred == label for pred, label in list(zip(decoded_predictions, decoded_labels))])
+    wandb.log({"accuracy": results['acc']})
+
+    ### sample outputs
+    my_table = wandb.Table(columns=["inputs", "prediction", "groundtruth"], 
+    data=[list(t) for t in zip(decoded_inputs, decoded_predictions, decoded_labels)])
+    wandb.log({"demo": my_table})
+
+    min = np.min(labels)
+    print("labels min: ", min)
+    min = np.min(predictions)
+    print("predictions min:", min)
+    print(inputs.shape)
+    return results
 
 
 # def metric_fn(eval_predictions):
