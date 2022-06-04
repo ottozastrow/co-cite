@@ -50,7 +50,7 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
 generation_dataset = (
     tokenized_datasets["test"]
     .shuffle()
-    .select(list(range(args.miniature_dataset_size)))
+    .select(list(range(args.miniature_dataset_size//10+1)))
     .to_tf_dataset(
         batch_size=args.batchsize,
         columns=["input_ids", "attention_mask", "labels"],
