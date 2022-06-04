@@ -3,14 +3,17 @@ import pdb
 
 from datasets import load_metric
 
-
-def create_metrics(tokenizer):
+def create_metrics(tokenizer, wandb):
     """Function that is passed to Trainer to compute training metrics"""
 
     metric_bleu = load_metric("bleu")
 
     def compute_metrics(eval_preds):
-        logits, labels = eval_preds
+        logits = eval_preds.predictions
+        labels = eval_preds.label_ids
+        # logits[0] are the outputs batch x seq_len x vocab_size
+        # logits[1] are (TODO check) output attention masks batch input_seq_len x 512
+        # labels is 
 
         ### bleu metric
         predictions = np.argmax(logits[0], axis=-1)
@@ -20,20 +23,26 @@ def create_metrics(tokenizer):
         # first element wise comparison, if there is a single false value, then the whole sequence is wrong
         sample_wise_acc = np.equal(predictions, labels).all(axis=1)
         results["accuracy"] = np.mean(sample_wise_acc)
-        
+
         ### sample outputs
+        num_demo_samples = 5
         sample_outputs = tokenizer.batch_decode(
-            predictions, 
+            predictions[:num_demo_samples], 
             skip_special_tokens=True,
             clean_up_tokenization_spaces=True)
         # outputs = [output.replace("@cit@", "") for output in outputs]
         sample_labels = tokenizer.batch_decode(
-            labels, 
+            labels[:num_demo_samples], 
             skip_special_tokens=True,
             clean_up_tokenization_spaces=True)
 
-        results["samples"] = list(zip(sample_outputs, sample_labels))
-        
+        results["sample_predictions"] = sample_outputs
+        results["sample_groundtruths"] = sample_labels
+
+        table = wandb.Table(columns=["prediction", "groundtruth"], data=[list(t) for t in zip(sample_outputs, sample_labels)])
+        results["samples"] = table
+        # wandb.log({"samples", table})
+        # wandb.log({'inloop_eval': results})
         return results
     return compute_metrics
 

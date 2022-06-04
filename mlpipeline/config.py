@@ -9,6 +9,8 @@ def cmd_arguments():
     parser.add_argument("--contextlength", type=int, help="context length", default=300)
     parser.add_argument("--miniature_dataset", 
                         help="for debugging only use 20 samples", action="store_true")
+    parser.add_argument("--notraining", 
+                        help="don't call trainer.train()", action="store_true")
     parser.add_argument("--debug", 
                         help="make data and model tiny for fast local debugging", action="store_true")
     parser.add_argument("--miniature_dataset_size", help="max number of documents to use for building dataset", 
@@ -19,7 +21,8 @@ def cmd_arguments():
 
     if args.debug:
         args.miniature_dataset = True
-        args.miniature_dataset_size = 2
+        args.miniature_dataset_size = 1
         args.batchsize = 2
-        args.epochs = 1
+        args.epochs = 2
+        # os.environ["WANDB_DISABLED"] = "true"
     return args
