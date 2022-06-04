@@ -50,7 +50,7 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
 generation_dataset = (
     tokenized_datasets["test"]
     .shuffle()
-    .select(list(range(args.miniature_dataset_size*2)))
+    .select(list(range(args.miniature_dataset_size)))
     .to_tf_dataset(
         batch_size=args.batchsize,
         columns=["input_ids", "attention_mask", "labels"],
@@ -68,7 +68,7 @@ def rouge_fn(data):
 
     decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     print("finished decoding predictions")
-    # inputs = np.where(inputs != -100, inputs, tokenizer.pad_token_id)
+    predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     # decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
     print("finished decoding labels")
