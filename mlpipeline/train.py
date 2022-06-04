@@ -66,9 +66,9 @@ def rouge_fn(data):
     # predictions = model.generate(inputs)
     print("finished generating predictions")
 
+    predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     print("finished decoding predictions")
-    predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     # decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
     print("finished decoding labels")
