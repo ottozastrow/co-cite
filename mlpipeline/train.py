@@ -50,7 +50,6 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
 generation_dataset = (
     tokenized_datasets["test"]
     .shuffle()
-    .select(list(range(6)))
     .to_tf_dataset(
         batch_size=args.batchsize,
         columns=["input_ids", "attention_mask", "labels"],
@@ -93,7 +92,7 @@ def rouge_fn(data):
 
 
 metric_callback = KerasMetricCallback(
-    metric_fn=rouge_fn, eval_dataset=generation_dataset, predict_with_generate=True
+    metric_fn=rouge_fn, eval_dataset=tf_test_set, predict_with_generate=True
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
 model.compile(optimizer=optimizer)

@@ -40,6 +40,7 @@ def dataset_from_disk(args):
     else:
         print("parquet file already exists, loading from parquet...")
         df = datasets.load_dataset("parquet", data_files=fname)
+        df = df['train']  # load_datasets makes this necessary
     return df
 
 # def read_files_to_df(args):
@@ -105,9 +106,6 @@ def load_dataset(passedargs):
     global args
     args = passedargs
     df = dataset_from_disk(args)
-    # import pdb
-    # pdb.set_trace()
-    df = df['train']
     df = df.train_test_split(test_size=0.2)
     return df
     
