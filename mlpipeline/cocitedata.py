@@ -75,13 +75,16 @@ def get_citation_context(x):
         # variant_index, _ = max(enumerate(x['citation_vocab'][i]), key=lambda x: len(x[1]))
         # variant_index = 0  # TODO understand why there are several indices and replace this line
         # index = x['citation_indices'][i][variant_index]
-        index = indexes[i]
-        start_index = max(0, index-contextlength)
-        stop_index = index  # TODO: also look at text after citation
-        context = x['txt'][start_index:stop_index]
-        citation = x['citation_texts'][i]
-        inputs.append(context)
-        targets.append(citation)
+        try:
+            index = indexes[i]
+            start_index = max(0, index-contextlength)
+            stop_index = index  # TODO: also look at text after citation
+            context = x['txt'][start_index:stop_index]
+            citation = x['citation_texts'][i]
+            inputs.append(context)
+            targets.append(citation)
+        except:
+            print("skip citation", i, indexes)
 
     x['inputs'] = inputs
     x['targets'] = targets
