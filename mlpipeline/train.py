@@ -65,6 +65,7 @@ def rouge_fn(data):
     inputs, labels = data
     predictions = model.generate(inputs)
     decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
     
     ### Compute ROUGE
@@ -78,7 +79,7 @@ def rouge_fn(data):
 
     ### sample outputs
     my_table = wandb.Table(columns=["inputs", "prediction", "groundtruth"], 
-    data=[list(t) for t in zip(inputs, decoded_predictions, decoded_labels)])
+    data=[list(t) for t in zip(decoded_inputs, decoded_predictions, decoded_labels)])
     wandb.log({"demo": my_table})
     return results
 
