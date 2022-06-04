@@ -47,10 +47,11 @@ trainer = Seq2SeqTrainer(
     eval_dataset=tokenized_datasets["test"],
     tokenizer=tokenizer,
     data_collator=data_collator,
-    compute_metrics=train_helpers.create_metrics(tokenizer, wandb),
+    compute_metrics=train_helpers.create_metrics(tokenizer),
 )
 if not args.notraining:
     trainer.train()
+
 predictions = trainer.predict(tokenized_datasets["test"])
 results = train_helpers.create_metrics(tokenizer)(predictions)
 wandb.log({'eval_test': results})

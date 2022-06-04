@@ -2,8 +2,9 @@ import numpy as np
 import pdb
 
 from datasets import load_metric
+import wandb
 
-def create_metrics(tokenizer, wandb):
+def create_metrics(tokenizer):
     """Function that is passed to Trainer to compute training metrics"""
 
     metric_bleu = load_metric("bleu")
@@ -39,10 +40,10 @@ def create_metrics(tokenizer, wandb):
         results["sample_predictions"] = sample_outputs
         results["sample_groundtruths"] = sample_labels
 
-        table = wandb.Table(columns=["prediction", "groundtruth"], data=[list(t) for t in zip(sample_outputs, sample_labels)])
-        results["samples"] = table
-        # wandb.log({"samples", table})
-        # wandb.log({'inloop_eval': results})
+        my_table = wandb.Table(columns=["prediction", "groundtruth"], 
+        data=[list(t) for t in zip(sample_outputs, sample_labels)])
+        wandb.log({"demo": my_table})
+        results["samples"] = my_table
         return results
     return compute_metrics
 
