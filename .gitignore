@@ -6,6 +6,9 @@
 
 #loggings
 *lsf.o**
+**/wandb/
+**/mlruns/
+**/results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
