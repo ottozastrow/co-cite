@@ -62,14 +62,14 @@ generation_dataset = (
 rouge_metric = load_metric("rouge")
 
 def rouge_fn(data):
-    inputs, labels = data
-    predictions = model.generate(inputs)
+    predictions, labels = data
+    # predictions = model.generate(inputs)
     print("finished generating predictions")
 
     decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     print("finished decoding predictions")
-    inputs = np.where(inputs != -100, inputs, tokenizer.pad_token_id)
-    decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
+    # inputs = np.where(inputs != -100, inputs, tokenizer.pad_token_id)
+    # decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
     print("finished decoding labels")
 
@@ -83,15 +83,14 @@ def rouge_fn(data):
     wandb.log({"accuracy": results['acc']})
 
     ### sample outputs
-    my_table = wandb.Table(columns=["inputs", "prediction", "groundtruth"], 
-    data=[list(t) for t in zip(decoded_inputs, decoded_predictions, decoded_labels)])
+    my_table = wandb.Table(columns=["prediction", "groundtruth"], 
+    data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
     wandb.log({"demo": my_table})
 
     min = np.min(labels)
     print("labels min: ", min)
     min = np.min(predictions)
     print("predictions min:", min)
-    print(inputs.shape)
     return results
 
 
