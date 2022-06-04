@@ -49,14 +49,16 @@ trainer = Seq2SeqTrainer(
     data_collator=data_collator,
     compute_metrics=train_helpers.create_metrics(tokenizer),
 )
-if not args.notraining:
-    trainer.train()
 
-predictions = trainer.predict(tokenized_datasets["test"])
-results = train_helpers.create_metrics(tokenizer)(predictions)
-wandb.log({'eval_test': results})
+for i in range(10):
+    if not args.notraining:
+        trainer.train()
 
-predictions = trainer.predict(tokenized_datasets["train"])
-results = train_helpers.create_metrics(tokenizer)(predictions)
-wandb.log({'eval_train': results})
+    predictions = trainer.predict(tokenized_datasets["test"])
+    results = train_helpers.create_metrics(tokenizer)(predictions)
+    wandb.log({'eval_test': results})
+
+    predictions = trainer.predict(tokenized_datasets["train"])
+    results = train_helpers.create_metrics(tokenizer)(predictions)
+    wandb.log({'eval_train': results})
 
