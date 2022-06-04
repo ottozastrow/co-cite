@@ -8,3 +8,4 @@ torch==1.10.1
 tqdm==4.62.3
 transformers==4.13.0
 webcolors==1.12
+rouge_score==0.0.4

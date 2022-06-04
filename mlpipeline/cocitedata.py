@@ -2,7 +2,7 @@
 import os
 import pandas as pd
 import tqdm
-from datasets import Dataset
+import datasets
 
 
 args = None  # put cmd arguments in here
@@ -16,25 +16,39 @@ def get_longest(citations):
     return longest_variants
 
 
-def read_files_to_df(args):
+def dataset_from_disk(args):
     # read file
     # get list of filepaths in data_dir
     filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
 
     dfs = [] # an empty list to store the data frames
-
     if args.miniature_dataset:
         filepaths = filepaths[:args.miniature_dataset_size]
+    datalen = len(filepaths)
+    fname = args.data_dir[:-1] + "_len_" + str(datalen) + ".parquet"
 
-    print("reading json files into df")
-    for file in tqdm.tqdm(filepaths):
-        data = pd.read_json(file, lines=True) # read data frame from json file
-        dfs.append(data) # append the data frame to the list
+    if not os.path.exists(fname):
+        print("reading json files into df")
+        for file in tqdm.tqdm(filepaths):
+            data = pd.read_json(file, lines=True) # read data frame from json file
+            dfs.append(data) # append the data frame to the list
 
-    df = pd.concat(dfs, ignore_index=True)
-    df['longest_citations'] = df['citation_vocab'].apply(get_longest)
-    # longest citations is a list of citations instead of a list of a list of citations
+        df = pd.concat(dfs, ignore_index=True)
+        df = preprocess_data(df)  # expensive operation
+        print("saving df to parquet", fname)
+        df = df.to_parquet(fname, compression=None)
+    else:
+        print("parquet file already exists, loading from parquet...")
+        df = datasets.load_dataset("parquet", data_files=fname)
     return df
+
+# def read_files_to_df(args):
+#     filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
+
+#     if args.miniature_dataset:
+#         filepaths = filepaths[:args.miniature_dataset_size]
+#     dataset = load_dataset('json', data_files=filepaths)
+
 
 
 def find_all_indexes(txt, substr):
@@ -53,7 +67,7 @@ def get_citation_context(x):
     """Extract inputs and targets from a dataframe row"""
     inputs = []
     targets = []
-    contextlength = args.contextlength
+    contextlength = 1000
     indexes = find_all_indexes(x['txt'], "@cit@")  # TODO replace compuationally iniefficient method
     
     for i in range(len(x['citation_vocab'])):
@@ -73,6 +87,8 @@ def get_citation_context(x):
     return x
 
 def preprocess_data(df):
+    df['longest_citations'] = df['citation_vocab'].apply(get_longest)
+
     # read a fixed length context around each citation
     df = df.apply(get_citation_context, axis=1)
 
@@ -82,17 +98,16 @@ def preprocess_data(df):
     columns = {'text' : inputs_series,
                'label' : targets_series}
     df_pairs = pd.DataFrame(columns)
-    dataset = Dataset.from_pandas(df_pairs)
-    dataset = dataset.train_test_split(test_size=0.2)
-    print("train samples: ", len(dataset['train']), 
-          "test samples: ", len(dataset['test']))
-    return dataset
+    return df_pairs
 
 
 def load_dataset(passedargs):
     global args
     args = passedargs
-    df = read_files_to_df(args)
-    df = preprocess_data(df)
+    df = dataset_from_disk(args)
+    # import pdb
+    # pdb.set_trace()
+    df = df['train']
+    df = df.train_test_split(test_size=0.2)
     return df
     
