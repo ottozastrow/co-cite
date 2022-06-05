@@ -67,54 +67,38 @@ generation_train_dataset = (
     )
 )
 
-
+metric_fn_test = train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args)
+metric_fn_train = train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args)
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
-    metric_fn=train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args), 
-        eval_dataset=generation_test_dataset, predict_with_generate=True, num_beams=3
+    metric_fn=metric_fn_test, 
+    eval_dataset=generation_test_dataset, 
+    predict_with_generate=True, num_beams=3
 )
 metric_train_callback = keras_metric_callback.KerasMetricCallback(
-    metric_fn=train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args), 
-        eval_dataset=generation_train_dataset, predict_with_generate=True, num_beams=3
+    metric_fn=metric_fn_train, 
+    eval_dataset=generation_train_dataset, 
+    predict_with_generate=True, num_beams=3
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
 model.compile(optimizer=optimizer)
+
+wandb_callback = WandbCallback(save_model=not args.debug)
+
 if not args.notraining:
     model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs,
-              callbacks=[WandbCallback(), metric_test_callback, metric_train_callback])
+              callbacks=[wandb_callback, metric_test_callback, metric_train_callback])
 
-# training_args = Seq2SeqTrainingArguments(
-#     output_dir="./results",
-#     evaluation_strategy="steps",
-#     learning_rate=2e-5,
-#     eval_accumulation_steps=8,
-#     per_device_train_batch_size=args.batchsize,
-#     per_device_eval_batch_size=args.batchsize,
-#     weight_decay=0.01,
-#     save_total_limit=3,
-#     num_train_epochs=args.epochs,
-#     fp16=False,
-#     report_to="wandb"
-# )
-# import pdb
+### evaluate model
+for batch in generation_test_dataset:
+    inputs = batch["input_ids"]
+    labels = batch["labels"]
+    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk)
+    results = metric_fn_test((predictions, labels), topk=args.topk)
+    print({'eval_test': results})
 
-# trainer = Seq2SeqTrainer(
-#     model=model,
-#     args=training_args,
-#     train_dataset=tokenized_datasets["train"],
-#     eval_dataset=tokenized_datasets["test"],
-#     tokenizer=tokenizer,
-#     data_collator=data_collator,
-#     compute_metrics=train_helpers.create_metrics(tokenizer),
-# )
-
-# if not args.notraining:
-#     trainer.train()
-
-# predictions = trainer.predict(tokenized_datasets["test"])
-# results = train_helpers.create_metrics(tokenizer)(predictions)
-# wandb.log({'eval_test': results})
-
-# predictions = trainer.predict(tokenized_datasets["train"])
-# results = train_helpers.create_metrics(tokenizer)(predictions)
-# wandb.log({'eval_train': results})
-
+for batch in generation_train_dataset:
+    inputs = batch["input_ids"]
+    labels = batch["labels"]
+    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk)
+    results = metric_fn_test((predictions, labels), topk=args.topk)
+    print({'eval_train': results})

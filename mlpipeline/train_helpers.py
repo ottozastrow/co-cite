@@ -28,9 +28,12 @@ import pdb
 #         num_beams=args.topk,
 #         #device=model.device,
 #     )
-#     pdb.set_trace()
 #     outputs = model.beam_search(logits, beam_scorer, logits_processor=logits_processor)
 #     return outputs
+
+
+def batch_accuracy(predictions, labels):
+    return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
 
 
 def create_metrics_fn(prefix, tokenizer, model, args):
@@ -45,13 +48,10 @@ def create_metrics_fn(prefix, tokenizer, model, args):
 
     rouge_metric = load_metric("rouge")
     import timeit
-    def metrics_fn(data):
+    def metrics_fn(data, topk=1):
         predictions, labels = data
         # use transformers beam search to get the top k predictions
         # predictions = logits_to_topk(logits, model, args)
-        # import pdb
-        # pdb.set_trace()
-        # del logits
 
         print("finished generating predictions")
         predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
@@ -63,19 +63,25 @@ def create_metrics_fn(prefix, tokenizer, model, args):
 
         ### Compute ROUGE
         # measure time with timeit
-        start = timeit.default_timer()
-        result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
-        end = timeit.default_timer()
-        print("rouge time: ", end - start)
-        results =  {(prefix + key): value.mid.fmeasure * 100 for key, value in result.items()}
-        wandb.log({prefix + "rouge": results})
+        results = {}
+        if topk == 1:
+            result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
+            start = timeit.default_timer()
+            end = timeit.default_timer()
+            print("rouge time: ", end - start)
+            results =  {(prefix + key): value.mid.fmeasure * 100 for key, value in result.items()}
+            wandb.log({prefix + "rouge": results})
 
         ### accuracy
-        # measure time with timeit
-        start = timeit.default_timer()
-        results[prefix + 'acc'] = np.mean([pred == label for pred, label in list(zip(decoded_predictions, decoded_labels))])
-        end = timeit.default_timer()
-        print("acc time: ", end - start)
+        if topk != 1:
+            accuracy_per_sample = []
+            for i in range(topk):
+                accuracy_per_sample.append(batch_accuracy(decoded_predictions[i], decoded_labels))
+            
+            results[prefix + 'acc_top' + str(topk)] = np.mean(np.array(accuracy_per_sample))
+            wandb.log({prefix + 'acc_top' + str(topk): results[prefix + 'acc_top' + str(topk)]})
+
+        results[prefix + 'acc'] = batch_accuracy(decoded_predictions[0], decoded_labels)
     
         wandb.log({prefix + "accuracy": results[prefix + 'acc']})
 

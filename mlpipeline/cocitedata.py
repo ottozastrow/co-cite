@@ -21,35 +21,29 @@ def dataset_from_disk(args):
     # get list of filepaths in data_dir
     filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
 
-    dfs = [] # an empty list to store the data frames
     if args.miniature_dataset:
         filepaths = filepaths[:args.miniature_dataset_size]
     datalen = len(filepaths)
     fname = args.data_dir[:-1] + "_len_" + str(datalen) + ".parquet"
-
+    df = None
     if not os.path.exists(fname):
         print("reading json files into df")
         for file in tqdm.tqdm(filepaths):
             data = pd.read_json(file, lines=True) # read data frame from json file
-            dfs.append(data) # append the data frame to the list
+            data = preprocess_data(data)  # expensive operation
+            if df is None:
+                df = data
+            else:
+                pd.concat([df, data], copy=False, ignore_index=True)
 
-        df = pd.concat(dfs, ignore_index=True)
-        df = preprocess_data(df)  # expensive operation
-        print("saving df to parquet", fname)
+        print("finished converting to df")
         df = df.to_parquet(fname, compression=None)
+        print("saved df to parquet", fname)
     else:
         print("parquet file already exists, loading from parquet...")
         df = datasets.load_dataset("parquet", data_files=fname)
         df = df['train']  # load_datasets makes this necessary
     return df
-
-# def read_files_to_df(args):
-#     filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
-
-#     if args.miniature_dataset:
-#         filepaths = filepaths[:args.miniature_dataset_size]
-#     dataset = load_dataset('json', data_files=filepaths)
-
 
 
 def find_all_indexes(txt, substr):
