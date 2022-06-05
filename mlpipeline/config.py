@@ -23,8 +23,8 @@ def cmd_arguments():
 
     if args.debug:
         args.miniature_dataset = True
-        args.miniature_dataset_size = 2
+        args.miniature_dataset_size = 5
         args.batchsize = 2
-        args.epochs = 2
+        args.epochs = 1
         os.environ["WANDB_DISABLED"] = "true"
     return args

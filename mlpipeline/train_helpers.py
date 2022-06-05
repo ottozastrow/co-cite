@@ -50,6 +50,8 @@ def create_metrics_fn(prefix, tokenizer, model, args):
     import timeit
     def metrics_fn(data, topk=1):
         predictions, labels = data
+        # import pdb
+        # pdb.set_trace()
         # use transformers beam search to get the top k predictions
         # predictions = logits_to_topk(logits, model, args)
 

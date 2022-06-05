@@ -34,15 +34,16 @@ def dataset_from_disk(args):
             if df is None:
                 df = data
             else:
-                pd.concat([df, data], copy=False, ignore_index=True)
+                df = pd.concat([df, data], copy=False, ignore_index=True)
 
         print("finished converting to df")
         df = df.to_parquet(fname, compression=None)
         print("saved df to parquet", fname)
-    else:
-        print("parquet file already exists, loading from parquet...")
-        df = datasets.load_dataset("parquet", data_files=fname)
-        df = df['train']  # load_datasets makes this necessary
+    
+    del df
+    print("parquet file already exists, loading from parquet...")
+    df = datasets.load_dataset("parquet", data_files=fname)
+    df = df['train']  # load_datasets makes this necessary
     return df
 
 

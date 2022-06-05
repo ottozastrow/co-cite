@@ -92,13 +92,13 @@ if not args.notraining:
 for batch in generation_test_dataset:
     inputs = batch["input_ids"]
     labels = batch["labels"]
-    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk)
+    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk, output_scores=True)
     results = metric_fn_test((predictions, labels), topk=args.topk)
     print({'eval_test': results})
 
 for batch in generation_train_dataset:
     inputs = batch["input_ids"]
     labels = batch["labels"]
-    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk)
+    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk, output_scores=True)
     results = metric_fn_test((predictions, labels), topk=args.topk)
     print({'eval_train': results})
