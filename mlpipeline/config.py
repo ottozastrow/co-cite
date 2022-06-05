@@ -1,12 +1,14 @@
 import argparse
+import os
 
 
 def cmd_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--modelname", help="name on huggingface model hub", default="t5-small")
-    parser.add_argument("--epochs", type=int, help="number of epochs", default=20)
+    parser.add_argument("--epochs", type=int, help="number of epochs", default=30)
     parser.add_argument("--batchsize", type=int, help="batch size", default=16)
     parser.add_argument("--contextlength", type=int, help="context length", default=300)
+    parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
     parser.add_argument("--miniature_dataset", 
                         help="for debugging only use 20 samples", action="store_true")
     parser.add_argument("--notraining", 
@@ -21,8 +23,8 @@ def cmd_arguments():
 
     if args.debug:
         args.miniature_dataset = True
-        args.miniature_dataset_size = 2
+        args.miniature_dataset_size = 1
         args.batchsize = 2
         args.epochs = 2
-        # os.environ["WANDB_DISABLED"] = "true"
+        os.environ["WANDB_DISABLED"] = "true"
     return args

@@ -1,19 +1,18 @@
+from config import cmd_arguments
+args = cmd_arguments()
+
 from prometheus_client import MetricsHandler
-import wandb
 import numpy as np
 from wandb.keras import WandbCallback
 
-from datasets import load_metric
-from transformers.keras_callbacks import KerasMetricCallback
-from transformers import AutoModelForSeq2SeqLM, Seq2SeqTrainingArguments, Seq2SeqTrainer, \
-    AutoTokenizer, DataCollatorForSeq2Seq, AutoModelForSeq2SeqLM, \
-    Seq2SeqTrainingArguments, Seq2SeqTrainer
+# from transformers.keras_callbacks import KerasMetricCallback
+from transformers import AutoTokenizer, DataCollatorForSeq2Seq, TFAutoModelForSeq2SeqLM, AdamWeightDecay
 
 import cocitedata
 import train_helpers
-from config import cmd_arguments
+import keras_metric_callback
 
-args = cmd_arguments()
+import wandb
 wandb.init(project="cocite")
 wandb.config.update(args)
 
@@ -21,9 +20,7 @@ wandb.config.update(args)
 dataset = cocitedata.load_dataset(args)
 
 # initialize model
-# model = AutoModelForSeq2SeqLM.from_pretrained(args.modelname)
-from transformers import TFAutoModelForSeq2SeqLM, AdamWeightDecay
-model = TFAutoModelForSeq2SeqLM.from_pretrained("t5-small")
+model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname)
 tokenizer = AutoTokenizer.from_pretrained(args.modelname)
 
 tokenized_datasets = dataset.map(
@@ -47,7 +44,7 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
     collate_fn=data_collator,
     
 )
-generation_dataset = (
+generation_test_dataset = (
     tokenized_datasets["test"]
     .shuffle()
     .select(list(range(args.miniature_dataset_size//10+1)))
@@ -58,59 +55,32 @@ generation_dataset = (
         collate_fn=data_collator,
     )
 )
-
-rouge_metric = load_metric("rouge")
-
-def rouge_fn(data):
-    predictions, labels = data
-    # predictions = model.generate(inputs)
-    print("finished generating predictions")
-
-    predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
-    decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-    print("finished decoding predictions")
-    # decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-    print("finished decoding labels")
-
-    ### Compute ROUGE
-    result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
-    results =  {key: value.mid.fmeasure * 100 for key, value in result.items()}
-    wandb.log({"rouge": results})
-
-    ### accuracy
-    results['acc'] = np.mean([pred == label for pred, label in list(zip(decoded_predictions, decoded_labels))])
-    wandb.log({"accuracy": results['acc']})
-
-    ### sample outputs
-    my_table = wandb.Table(columns=["prediction", "groundtruth"], 
-    data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
-    wandb.log({"demo": my_table})
-
-    min = np.min(labels)
-    print("labels min: ", min)
-    min = np.min(predictions)
-    print("predictions min:", min)
-    return results
+generation_train_dataset = (
+    tokenized_datasets["train"]
+    .shuffle()
+    .select(list(range(args.miniature_dataset_size//10+1)))
+    .to_tf_dataset(
+        batch_size=args.batchsize,
+        columns=["input_ids", "attention_mask", "labels"],
+        shuffle=False,
+        collate_fn=data_collator,
+    )
+)
 
 
-# def metric_fn(eval_predictions):
-#     preds, labels = eval_predictions
-#     prediction_lens = [
-#         np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
-#     ]
-#     result["gen_len"] = np.mean(prediction_lens)
-#     return result
-
-
-metric_callback = KerasMetricCallback(
-    metric_fn=rouge_fn, eval_dataset=generation_dataset, predict_with_generate=True
+metric_test_callback = keras_metric_callback.KerasMetricCallback(
+    metric_fn=train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args), 
+        eval_dataset=generation_test_dataset, predict_with_generate=True, num_beams=3
+)
+metric_train_callback = keras_metric_callback.KerasMetricCallback(
+    metric_fn=train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args), 
+        eval_dataset=generation_train_dataset, predict_with_generate=True, num_beams=3
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
 model.compile(optimizer=optimizer)
 if not args.notraining:
     model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs,
-              callbacks=[WandbCallback(), metric_callback])
+              callbacks=[WandbCallback(), metric_test_callback, metric_train_callback])
 
 # training_args = Seq2SeqTrainingArguments(
 #     output_dir="./results",
