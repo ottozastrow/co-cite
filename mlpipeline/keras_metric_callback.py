@@ -3,10 +3,11 @@ from time import sleep
 from typing import Callable, List, Optional, Union
 
 import numpy as np
+from sqlalchemy import all_
 import tensorflow as tf
 from packaging.version import parse
 from tensorflow.keras.callbacks import Callback
-
+import matplotlib.pyplot as plt
 import wandb
 
 
@@ -71,11 +72,13 @@ class KerasMetricCallback(Callback):
         batch_size: Optional[int] = None,
         predict_with_generate: Optional[bool] = False,
         num_beams: Optional[int] = 1,
+        prefix: Optional[str] = None,
     ):
         super().__init__()
         self.step_num = 0
         self.metric_fn = metric_fn
         self.batch_size = batch_size
+        self.prefix = prefix
         if not isinstance(eval_dataset, tf.data.Dataset):
             if batch_size is None:
                 raise ValueError(
@@ -180,9 +183,9 @@ class KerasMetricCallback(Callback):
             else:
                 main_input_name = getattr(self.model, "main_input_name", "input_ids")
 
-        # prediction_list = []
-        # label_list = []
         metric_outputs = []
+        all_matches = []  # stores whether each prediction matches the label for each citation
+        all_scores = []
         # The whole predict/generate loop is handled inside this method
         for batch in self.eval_dataset:
             if isinstance(batch, tuple):
@@ -219,15 +222,21 @@ class KerasMetricCallback(Callback):
                 labels = labels.numpy()
             else:
                 raise TypeError(f"Confused by labels of type {type(labels)}")
-            # label_list.append(labels)
+            
 
             # all_preds = self._postprocess_predictions_or_labels(prediction_list)
             # all_labels = self._postprocess_predictions_or_labels(label_list)
 
-            metric_output = self.metric_fn((predictions, labels))
+            metric_output, matches, scores = self.metric_fn((predictions, labels))
+            all_matches += matches
+            all_scores += scores
+
             metric_outputs.append(metric_output)
         
         metric_output = mean_over_metrics_batches(metric_outputs)
+        all_matches = np.array(all_matches).astype(int)
+        all_scores = np.array(all_scores)
+        plot_precision_recall(all_matches, all_scores, prefix=self.prefix)
 
         if not isinstance(metric_output, dict):
             raise TypeError(
@@ -244,6 +253,35 @@ class KerasMetricCallback(Callback):
         if self.step_num % self.log_interval == 0:
             self.on_epoch_end(0, logs=logs)
         self.step_num += 1
+
+
+def plot_precision_recall(matches, scores, prefix, buckets=40):
+    # matches = preds == targets
+    # create thresholds
+    min, max = np.min(scores), np.max(scores)
+    thresholds = np.linspace(min, max, buckets)
+
+    # for every threshold, compute the precision
+    precisions = []
+    for threshold in thresholds:
+        # compute the number of true positives
+        true_positives = np.sum(matches & (scores >= threshold))
+        # compute the number of false positives
+        false_positives = np.sum(np.logical_not(matches) & (scores >= threshold))
+        # compute the precision
+        precision = true_positives / (true_positives + false_positives)
+        # append the precision to the list of precisions
+        precisions.append(precision)
+
+    # plot curve
+    plt.plot(thresholds, precisions)
+    # yaxsis, xaxis, title
+    plt.xlabel('Threshold')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+
+    wandb.log({prefix + "_precision_recall": plt})
+
 
 def mean_over_metrics_batches(metric_outputs):
     # iterate through keys and items in metric_outputs and compute mean

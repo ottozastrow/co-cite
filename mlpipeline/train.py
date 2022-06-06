@@ -73,12 +73,12 @@ metric_fn_test = CustomMetrics(prefix="test_", tokenizer=tokenizer, model=model,
 metric_fn_train = CustomMetrics(prefix="train_", tokenizer=tokenizer, model=model, args=args).fast_metrics
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_test, 
-    eval_dataset=tf_test_set, 
+    eval_dataset=tf_test_set, prefix="test_",
     predict_with_generate=False, num_beams=3, batch_size=args.batchsize,
 )
 metric_train_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_train, 
-    eval_dataset=tf_train_set, 
+    eval_dataset=tf_train_set, prefix="train_",
     predict_with_generate=False, num_beams=3, batch_size=args.batchsize,
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
@@ -91,7 +91,7 @@ if not args.notraining:
               callbacks=[
                     wandb_callback,
                     metric_test_callback, 
-                    # metric_train_callback
+                    metric_train_callback
               ])
 
 ### evaluate model

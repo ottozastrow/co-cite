@@ -3,6 +3,7 @@ import pdb
 import tensorflow as tf
 from tensorflow.nn import ctc_beam_search_decoder
 import timeit
+import matplotlib.pyplot as plt
 
 from datasets import load_metric
 import wandb
@@ -64,8 +65,6 @@ class CustomMetrics():
             batch_token_accs = []
             for j in range(len(labels)):  # iterate through batch
                 beam_length = np.count_nonzero(beam[j])
-                # import pdb
-                # pdb.set_trace()
                 matches = beam[j][:beam_length] == labels[j][:beam_length]
                 batch_token_accs.append(np.mean(matches))
                 exact_match = all(matches)
@@ -84,7 +83,37 @@ class CustomMetrics():
         stop = timeit.default_timer()
         print("Accuracy time: {}".format(stop - start))
 
-        return results
+        # scores
+        scores = log_probs[:, -1].numpy()
+        return results, list(match_at_k[0]), list(scores)
+
+
+def plot_precision_recall(preds, scores, targets, buckets=40):
+    matches = preds == targets
+    # create thresholds
+    min, max = np.min(scores), np.max(scores)
+    thresholds = np.linspace(min, max, buckets)
+
+    # for every threshold, compute the precision
+    precisions = []
+    for threshold in thresholds:
+        # compute the number of true positives
+        true_positives = np.sum(matches & (scores >= threshold))
+        # compute the number of false positives
+        false_positives = np.sum((preds != targets) & (scores >= threshold))
+        # compute the precision
+        precision = true_positives / (true_positives + false_positives)
+        # append the precision to the list of precisions
+        precisions.append(precision)
+
+    # plot curve
+    plt.plot(thresholds, precisions)
+    # yaxsis, xaxis, title
+    plt.xlabel('Threshold')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+
+    wandb.log({"precision_recall": plt})
 
 
 def batch_accuracy(predictions, labels):
