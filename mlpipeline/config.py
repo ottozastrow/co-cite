@@ -25,6 +25,6 @@ def cmd_arguments():
         args.miniature_dataset = True
         args.miniature_dataset_size = 1
         args.batchsize = 2
-        args.epochs = 1
+        args.epochs = 10
         # args.wandb_mode = "disabled"
     return args

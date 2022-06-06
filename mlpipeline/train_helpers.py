@@ -23,11 +23,13 @@ def logits_to_topk(logits, k):
     # tf requires length x batchsize x num_classes
     logits_tf = tf.reshape(logits, (logits.shape[1], logits.shape[0], logits.shape[2]))
     sequence_length = tf.ones(logits.shape[0], dtype=tf.int32) * logits.shape[1]
+
     beams, log_probs = ctc_beam_search_decoder(
         logits_tf, sequence_length=sequence_length, 
         beam_width=k,
         top_paths=k
     )
+
     beams = [tf.sparse.to_dense(b) for b in beams]
 
     return beams, log_probs
@@ -44,7 +46,7 @@ class CustomMetrics():
         # pdb.set_trace()
         logits = data[0]['logits']
         labels = data[1]['labels']
-        top_ks = [1, 3, 5, 10]
+        top_ks = [1, 3, 5]
         max_k = max(top_ks)
         # beam search start timeit
         start = timeit.default_timer()
