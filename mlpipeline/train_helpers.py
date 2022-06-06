@@ -1,5 +1,8 @@
 import numpy as np
 import pdb
+import tensorflow as tf
+from tensorflow.nn import ctc_beam_search_decoder
+import timeit
 
 from datasets import load_metric
 import wandb
@@ -12,31 +15,86 @@ from transformers import (
     BeamSearchScorer
 )
 import pdb
-# def logits_to_topk(logits, model, args):
-#     # input_ids = torch.ones((args.topk, 1), device=model.device, dtype=tf.)
 
-#     logits_processor = LogitsProcessorList(
-#         [MinLengthLogitsProcessor(10, eos_token_id=model.config.eos_token_id),]
-#     )
-#     model_kwargs = {
-#         "encoder_outputs": model.get_encoder()(
-#             logits.repeat_interleave(args.topk, dim=0), return_dict=True
-#     )}
 
-#     beam_scorer = BeamSearchScorer(
-#         batch_size=args.batchsize,
-#         num_beams=args.topk,
-#         #device=model.device,
-#     )
-#     outputs = model.beam_search(logits, beam_scorer, logits_processor=logits_processor)
-#     return outputs
+def logits_to_topk(logits, k):
+    # use beam search to get the top k predictions
+    # tf requires length x batchsize x num_classes
+    logits_tf = tf.reshape(logits, (logits.shape[1], logits.shape[0], logits.shape[2]))
+    sequence_length = tf.ones(logits.shape[0], dtype=tf.int32) * logits.shape[1]
+    beams, log_probs = ctc_beam_search_decoder(
+        logits_tf, sequence_length=sequence_length, 
+        beam_width=k,
+        top_paths=k
+    )
+    beams = [tf.sparse.to_dense(b) for b in beams]
+
+    return beams, log_probs
+
+class CustomMetrics():
+    def __init__(self, prefix, tokenizer, model, args):
+        self.prefix = prefix
+        self.tokenizer = tokenizer
+        self.model = model
+        self.args = args
+
+    def fast_metrics(self, data):
+        logits = data[0]['logits']
+        labels = data[1]
+        top_ks = [1, 3, 5, 10]
+        max_k = max(top_ks)
+        # beam search start timeit
+        start = timeit.default_timer()
+        beams, log_probs = logits_to_topk(logits, max_k)
+        # stop timeit
+        stop = timeit.default_timer()
+        print("Beam search time: {}".format(stop - start))
+
+        ### accuracies
+        # correctness of batchsize x beam_index
+        # start acc timeit
+        start = timeit.default_timer()
+        match_at_k = np.zeros((len(beams), len(labels)))
+        results = {}
+        for i in range(len(beams)):
+            batch_accs = []
+            beam = beams[i]
+            batch_token_accs = []
+            for j in range(len(labels)):  # iterate through batch
+                beam_length = np.count_nonzero(beam[j])
+                matches = beam[j][:beam_length] == labels[j][:beam_length]
+                batch_token_accs.append(np.mean(matches))
+                exact_match = all(matches)
+                batch_accs.append(exact_match)
+                match_at_k[i, j] = exact_match
+            if i == 0:
+                batch_acc = np.mean(batch_accs)
+                batch_token_acc = np.mean(batch_token_accs)
+                results[self.prefix + 'accuracy'] = batch_acc
+                results[self.prefix + 'token_accuracy'] = batch_token_acc
+
+        for k in top_ks:
+            topk_acc = np.mean(np.any(match_at_k[:k, :], axis=0))
+            results[self.prefix + "top{}_acc".format(k)] = topk_acc
+        # stop acc timeit
+        stop = timeit.default_timer()
+        print("Accuracy time: {}".format(stop - start))
+
+        return results
 
 
 def batch_accuracy(predictions, labels):
+    """Computes sequence wise accuracy.
+    Args:
+        predictions: predictions of shape (batch_size, sequence_length)
+        labels: labels of shape (batch_size, sequence_length)
+    Returns:
+        accuracy: average accuracy of the predictions"""
+
     return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
 
 
-def create_metrics_fn(prefix, tokenizer, model, args):
+def create_metrics_fn(prefix, tokenizer, model, args, fast_metrics_only=False):
     """Function that computes all metrics for the given dataset.
     Args:
         prefix: name prefix for the metrics (e.g. "test_")
@@ -50,50 +108,46 @@ def create_metrics_fn(prefix, tokenizer, model, args):
     import timeit
     def metrics_fn(data, topk=1):
         # predictions, labels = data
-        import pdb
-        pdb.set_trace()
-        predictions = data[0]["sequences"]
         labels = data[1]
-        scores = data[0]["scores"]
+        predictions = data[0]["sequences"]
         
-        # use transformers beam search to get the top k predictions
-        # predictions = logits_to_topk(logits, model, args)
-        print("finished generating predictions")
-        predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
-        decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-        print("finished decoding predictions")
-        # decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
-        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-        print("finished decoding labels")
-
-        ### Compute ROUGE
-        # measure time with timeit
         results = {}
-        if topk == 1:
-            result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
-            start = timeit.default_timer()
-            end = timeit.default_timer()
-            print("rouge time: ", end - start)
-            results =  {(prefix + key): value.mid.fmeasure * 100 for key, value in result.items()}
-            wandb.log({prefix + "rouge": results})
+        
+        if not fast_metrics_only:
+            predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
+            decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+            print("finished decoding predictions")
+            decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+            print("finished decoding labels")
+
+            ### Compute ROUGE
+            # measure time with timeit
+            # if topk == 1:
+            #     result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
+            #     start = timeit.default_timer()
+            #     end = timeit.default_timer()
+            #     print("rouge time: ", end - start)
+            #     results =  {(prefix + key): value.mid.fmeasure * 100 for key, value in result.items()}
+            #     wandb.log({prefix + "rouge": results})
+            
+            ### sample outputs
+            my_table = wandb.Table(columns=["prediction", "groundtruth"], 
+            data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
+            wandb.log({prefix + "demo": my_table})
 
         ### accuracy
         if topk != 1:
             accuracy_per_sample = []
             for i in range(topk):
-                accuracy_per_sample.append(batch_accuracy(decoded_predictions[i], decoded_labels))
+                accuracy_per_sample.append(batch_accuracy(predictions[i], labels))
             
             results[prefix + 'acc_top' + str(topk)] = np.mean(np.array(accuracy_per_sample))
             wandb.log({prefix + 'acc_top' + str(topk): results[prefix + 'acc_top' + str(topk)]})
         
-        results[prefix + 'acc'] = batch_accuracy(decoded_predictions[0], decoded_labels)
+        results[prefix + 'acc'] = batch_accuracy(predictions[0], labels)
     
         wandb.log({prefix + "accuracy": results[prefix + 'acc']})
 
-        ### sample outputs
-        my_table = wandb.Table(columns=["prediction", "groundtruth"], 
-        data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
-        wandb.log({prefix + "demo": my_table})
 
         return results
     return metrics_fn

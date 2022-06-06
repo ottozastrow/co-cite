@@ -11,6 +11,7 @@ from transformers import AutoTokenizer, DataCollatorForSeq2Seq, TFAutoModelForSe
 import cocitedata
 import train_helpers
 import keras_metric_callback
+from train_helpers import CustomMetrics
 
 import wandb
 
@@ -46,7 +47,7 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
 generation_test_dataset = (
     tokenized_datasets["test"]
     .shuffle()
-    .select(list(range(args.miniature_dataset_size//10+1)))
+    .select(list(range(args.miniature_dataset_size//50+2)))
     .to_tf_dataset(
         batch_size=args.batchsize,
         columns=["input_ids", "attention_mask", "labels"],
@@ -57,7 +58,7 @@ generation_test_dataset = (
 generation_train_dataset = (
     tokenized_datasets["train"]
     .shuffle()
-    .select(list(range(args.miniature_dataset_size//10+1)))
+    .select(list(range(args.miniature_dataset_size//50+2)))
     .to_tf_dataset(
         batch_size=args.batchsize,
         columns=["input_ids", "attention_mask", "labels"],
@@ -67,16 +68,16 @@ generation_train_dataset = (
 )
 
 
-metric_fn_test = train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args)
-metric_fn_train = train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args)
+metric_fn_test = CustomMetrics(prefix="test_", tokenizer=tokenizer, model=model, args=args).fast_metrics
+metric_fn_train = CustomMetrics(prefix="train_", tokenizer=tokenizer, model=model, args=args).fast_metrics
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_test, 
-    eval_dataset=generation_test_dataset, 
+    eval_dataset=tf_test_set, 
     predict_with_generate=False, num_beams=3
 )
 metric_train_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_train, 
-    eval_dataset=generation_train_dataset, 
+    eval_dataset=tf_train_set, 
     predict_with_generate=False, num_beams=3
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
@@ -86,10 +87,16 @@ wandb_callback = WandbCallback(save_model=not args.debug)
 
 if not args.notraining:
     model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs,
-              callbacks=[wandb_callback, metric_test_callback, metric_train_callback])
+              callbacks=[
+                    wandb_callback,
+                    metric_test_callback, 
+                    # metric_train_callback
+              ])
 
 ### evaluate model
 if not args.noevaluation:
+    metric_fn_test = train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args)
+    metric_fn_train = train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args)
     for batch in generation_test_dataset:
         inputs = batch["input_ids"]
         labels = batch["labels"]
