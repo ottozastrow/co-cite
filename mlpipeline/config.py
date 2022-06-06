@@ -6,7 +6,7 @@ def cmd_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--modelname", help="name on huggingface model hub", default="t5-small")
     parser.add_argument("--wandb_mode", help="online, offline or disabled mode for wandb logging", default="online")
-    parser.add_argument("--epochs", type=int, help="number of epochs", default=30)
+    parser.add_argument("--epochs", type=int, help="number of epochs", default=5)
     parser.add_argument("--batchsize", type=int, help="batch size", default=16)
     parser.add_argument("--contextlength", type=int, help="context length", default=300)
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
