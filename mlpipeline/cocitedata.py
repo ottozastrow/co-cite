@@ -129,6 +129,6 @@ def load_dataset(passedargs):
         print("parquet file already exists, loading parquet...")
 
     df = parquet_to_dataset(data_dir_name)    
-    df = df.train_test_split(test_size=0.1, random_state=42)
+    df = df.train_test_split(test_size=0.1)
     return df
     
