@@ -44,10 +44,11 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
     collate_fn=data_collator,
     
 )
+num_demo_samples = min(100, args.miniature_dataset_size//50+2)
 generation_test_dataset = (
     tokenized_datasets["test"]
     .shuffle()
-    .select(list(range(args.miniature_dataset_size//50+2)))
+    .select(list(range(num_demo_samples)))
     .to_tf_dataset(
         batch_size=args.batchsize,
         columns=["input_ids", "attention_mask", "labels"],
@@ -58,7 +59,7 @@ generation_test_dataset = (
 generation_train_dataset = (
     tokenized_datasets["train"]
     .shuffle()
-    .select(list(range(args.miniature_dataset_size//50+2)))
+    .select(list(range(num_demo_samples)))
     .to_tf_dataset(
         batch_size=args.batchsize,
         columns=["input_ids", "attention_mask", "labels"],
@@ -73,12 +74,12 @@ metric_fn_train = CustomMetrics(prefix="train_", tokenizer=tokenizer, model=mode
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_test, 
     eval_dataset=tf_test_set, 
-    predict_with_generate=False, num_beams=3
+    predict_with_generate=False, num_beams=3, batch_size=args.batchsize,
 )
 metric_train_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_train, 
     eval_dataset=tf_train_set, 
-    predict_with_generate=False, num_beams=3
+    predict_with_generate=False, num_beams=3, batch_size=args.batchsize,
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
 model.compile(optimizer=optimizer)

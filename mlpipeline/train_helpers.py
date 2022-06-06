@@ -39,6 +39,8 @@ class CustomMetrics():
         self.args = args
 
     def fast_metrics(self, data):
+        import pdb
+        pdb.set_trace()
         logits = data[0]['logits']
         labels = data[1]
         top_ks = [1, 3, 5, 10]
