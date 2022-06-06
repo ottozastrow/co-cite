@@ -12,8 +12,8 @@ def cmd_arguments():
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
     parser.add_argument("--miniature_dataset", 
                         help="for debugging only use 20 samples", action="store_true")
-    parser.add_argument("--notraining", 
-                        help="don't call trainer.train()", action="store_true")
+    parser.add_argument("--notraining", help="skip training pipeline", action="store_true")
+    parser.add_argument("--noevaluation", help="skip post training evaluation pipeline", action="store_true")
     parser.add_argument("--debug", 
                         help="make data and model tiny for fast local debugging", action="store_true")
     parser.add_argument("--miniature_dataset_size", help="max number of documents to use for building dataset", 
@@ -25,7 +25,7 @@ def cmd_arguments():
 
     if args.debug:
         args.miniature_dataset = True
-        args.miniature_dataset_size = 200
+        args.miniature_dataset_size = 1
         args.batchsize = 2
         args.epochs = 1
         args.wandb_mode = "disabled"

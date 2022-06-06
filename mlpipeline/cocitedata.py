@@ -53,7 +53,7 @@ def preprocess_json_and_save_to_parquet(data_dir_name, args):
 
 def parquet_to_dataset(parquet_dir):
     parquet_files = [os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir) if f.endswith('.parquet')]
-    df = datasets.load_dataset("parquet", data_files=parquet_files)
+    df = datasets.load_dataset("parquet", data_files=parquet_files, cache_dir="huggingface_cache/datasets/")
     df = df['train']  # load_datasets makes this necessary
     return df
 

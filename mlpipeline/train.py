@@ -66,17 +66,18 @@ generation_train_dataset = (
     )
 )
 
+
 metric_fn_test = train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args)
 metric_fn_train = train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args)
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_test, 
     eval_dataset=generation_test_dataset, 
-    predict_with_generate=True, num_beams=3
+    predict_with_generate=False, num_beams=3
 )
 metric_train_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_train, 
     eval_dataset=generation_train_dataset, 
-    predict_with_generate=True, num_beams=3
+    predict_with_generate=False, num_beams=3
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
 model.compile(optimizer=optimizer)
@@ -88,20 +89,21 @@ if not args.notraining:
               callbacks=[wandb_callback, metric_test_callback, metric_train_callback])
 
 ### evaluate model
-for batch in generation_test_dataset:
-    inputs = batch["input_ids"]
-    labels = batch["labels"]
-    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
-                                 output_scores=True, return_dict_in_generate=True)
-    results = metric_fn_test((predictions, labels), topk=args.topk)
-    print({'eval_test': results})
-    wandb.log({'eval_test': results})
+if not args.noevaluation:
+    for batch in generation_test_dataset:
+        inputs = batch["input_ids"]
+        labels = batch["labels"]
+        predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
+                                    output_scores=True, return_dict_in_generate=True)
+        results = metric_fn_test((predictions, labels), topk=args.topk)
+        print({'eval_test': results})
+        wandb.log({'eval_test': results})
 
-for batch in generation_train_dataset:
-    inputs = batch["input_ids"]
-    labels = batch["labels"]
-    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
-                                 output_scores=True, return_dict_in_generate=True)
-    results = metric_fn_test((predictions, labels), topk=args.topk)
-    print({'eval_train': results})
-    wandb.log({'eval_train': results})
+    for batch in generation_train_dataset:
+        inputs = batch["input_ids"]
+        labels = batch["labels"]
+        predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
+                                    output_scores=True, return_dict_in_generate=True)
+        results = metric_fn_test((predictions, labels), topk=args.topk)
+        print({'eval_train': results})
+        wandb.log({'eval_train': results})

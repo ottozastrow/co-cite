@@ -50,6 +50,8 @@ def create_metrics_fn(prefix, tokenizer, model, args):
     import timeit
     def metrics_fn(data, topk=1):
         # predictions, labels = data
+        import pdb
+        pdb.set_trace()
         predictions = data[0]["sequences"]
         labels = data[1]
         scores = data[0]["scores"]
