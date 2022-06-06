@@ -39,10 +39,10 @@ class CustomMetrics():
         self.args = args
 
     def fast_metrics(self, data):
-        import pdb
-        pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         logits = data[0]['logits']
-        labels = data[1]
+        labels = data[1]['labels']
         top_ks = [1, 3, 5, 10]
         max_k = max(top_ks)
         # beam search start timeit
@@ -64,6 +64,8 @@ class CustomMetrics():
             batch_token_accs = []
             for j in range(len(labels)):  # iterate through batch
                 beam_length = np.count_nonzero(beam[j])
+                # import pdb
+                # pdb.set_trace()
                 matches = beam[j][:beam_length] == labels[j][:beam_length]
                 batch_token_accs.append(np.mean(matches))
                 exact_match = all(matches)

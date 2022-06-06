@@ -176,9 +176,9 @@ class KerasMetricCallback(Callback):
             else:
                 main_input_name = getattr(self.model, "main_input_name", "input_ids")
 
-        prediction_list = []
-        label_list = []
-
+        # prediction_list = []
+        # label_list = []
+        metric_outputs = []
         # The whole predict/generate loop is handled inside this method
         for batch in self.eval_dataset:
             if isinstance(batch, tuple):
@@ -204,7 +204,7 @@ class KerasMetricCallback(Callback):
                     predictions = {key: predictions[key] for key in self.output_cols}
                 else:
                     predictions = {key: val for key, val in predictions.items() if key not in ignore_keys + ["loss"]}
-            prediction_list.append(predictions)
+            # prediction_list.append(predictions)
             if not self.use_keras_label:
                 labels = {key: batch[key].numpy() for key in self.label_cols}
             elif isinstance(labels, dict):
@@ -215,12 +215,16 @@ class KerasMetricCallback(Callback):
                 labels = labels.numpy()
             else:
                 raise TypeError(f"Confused by labels of type {type(labels)}")
-            label_list.append(labels)
+            # label_list.append(labels)
 
-        all_preds = self._postprocess_predictions_or_labels(prediction_list)
-        all_labels = self._postprocess_predictions_or_labels(label_list)
+            # all_preds = self._postprocess_predictions_or_labels(prediction_list)
+            # all_labels = self._postprocess_predictions_or_labels(label_list)
 
-        metric_output = self.metric_fn((all_preds, all_labels))
+            metric_output = self.metric_fn((predictions, labels))
+            metric_outputs.append(metric_output)
+        
+        metric_output = mean_over_metrics_batches(metric_outputs)
+
         if not isinstance(metric_output, dict):
             raise TypeError(
                 f"metric_fn should return a dict mapping metric names to values but instead returned {metric_output}"
@@ -230,3 +234,17 @@ class KerasMetricCallback(Callback):
         # new keys in there, which will then get read by the History callback and treated like any other metric value.
         # I promise that I have it in writing from Chollet that this is okay.
         logs.update(metric_output)
+    
+
+def mean_over_metrics_batches(metric_outputs):
+    # iterate through keys and items in metric_outputs and compute mean
+    # create numpy array from list of dicts
+    keys_list = list(metric_outputs[0].keys())
+    np_metric_output = []
+    for batch in metric_outputs:
+        np_metric_output.append([batch[key] for key in keys_list])
+    np_metric_output = np.array(np_metric_output)
+    np_metric_output = np.mean(np_metric_output, axis=0)
+    # translate metric_outputs back to dict
+    metric_output = {key: val for key, val in zip(keys_list, np_metric_output)}
+    return metric_output
