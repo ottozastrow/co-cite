@@ -88,7 +88,7 @@ class KerasMetricCallback(Callback):
             # Wrap a tf.data.Dataset around it
             eval_dataset = tf.data.Dataset.from_tensor_slices(eval_dataset).batch(batch_size, drop_remainder=False)
         self.eval_dataset = eval_dataset
-        self.log_interval = max(2, len(self.eval_dataset) // 10)
+        self.log_interval = max(10, len(self.eval_dataset) // 10)
         self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
         self.num_beams = num_beams
@@ -250,7 +250,7 @@ class KerasMetricCallback(Callback):
         logs.update(metric_output)
 
     def on_train_batch_end(self, batch, logs=None):
-        if self.step_num % self.log_interval == 0:
+        if self.step_num % self.log_interval == 0 and self.prefix != "train_":
             self.on_epoch_end(0, logs=logs)
         self.step_num += 1
 
