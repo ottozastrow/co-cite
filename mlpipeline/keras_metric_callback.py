@@ -193,7 +193,7 @@ class KerasMetricCallback(Callback):
                     generation_inputs = batch
                     attention_mask = None
 
-                predictions = self.model.generate(generation_inputs, sample=True, num_beams=self.num_beams, num_return_sequence=self.num_beams)
+                predictions = self.model.generate(generation_inputs, sample=True, num_beams=self.num_beams, num_return_sequence=self.num_beams, output_scores=True, return_dict_in_generate=True)
             else:
                 predictions = self.model.predict(batch)
                 if isinstance(predictions, dict):

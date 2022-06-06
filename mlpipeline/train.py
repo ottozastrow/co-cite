@@ -13,9 +13,8 @@ import train_helpers
 import keras_metric_callback
 
 import wandb
-wandb.init(project="cocite")
-wandb.config.update(args)
 
+wandb.init(project="cocite", config=args, mode=args.wandb_mode)
 
 dataset = cocitedata.load_dataset(args)
 
@@ -92,13 +91,17 @@ if not args.notraining:
 for batch in generation_test_dataset:
     inputs = batch["input_ids"]
     labels = batch["labels"]
-    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk, output_scores=True)
+    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
+                                 output_scores=True, return_dict_in_generate=True)
     results = metric_fn_test((predictions, labels), topk=args.topk)
     print({'eval_test': results})
+    wandb.log({'eval_test': results})
 
 for batch in generation_train_dataset:
     inputs = batch["input_ids"]
     labels = batch["labels"]
-    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk, output_scores=True)
+    predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
+                                 output_scores=True, return_dict_in_generate=True)
     results = metric_fn_test((predictions, labels), topk=args.topk)
     print({'eval_train': results})
+    wandb.log({'eval_train': results})

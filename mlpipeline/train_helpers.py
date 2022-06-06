@@ -49,12 +49,13 @@ def create_metrics_fn(prefix, tokenizer, model, args):
     rouge_metric = load_metric("rouge")
     import timeit
     def metrics_fn(data, topk=1):
-        predictions, labels = data
-        # import pdb
-        # pdb.set_trace()
+        # predictions, labels = data
+        predictions = data[0]["sequences"]
+        labels = data[1]
+        scores = data[0]["scores"]
+        
         # use transformers beam search to get the top k predictions
         # predictions = logits_to_topk(logits, model, args)
-
         print("finished generating predictions")
         predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
         decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
@@ -82,7 +83,7 @@ def create_metrics_fn(prefix, tokenizer, model, args):
             
             results[prefix + 'acc_top' + str(topk)] = np.mean(np.array(accuracy_per_sample))
             wandb.log({prefix + 'acc_top' + str(topk): results[prefix + 'acc_top' + str(topk)]})
-
+        
         results[prefix + 'acc'] = batch_accuracy(decoded_predictions[0], decoded_labels)
     
         wandb.log({prefix + "accuracy": results[prefix + 'acc']})

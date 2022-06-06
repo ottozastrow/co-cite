@@ -16,33 +16,44 @@ def get_longest(citations):
     return longest_variants
 
 
-def dataset_from_disk(args):
-    # read file
-    # get list of filepaths in data_dir
-    filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
+def preprocess_json_and_save_to_parquet(data_dir_name, args):
+    """json data is the format provided by the BVA dataset.
+    This function converts it to parquet format.
+    
+    beforer converting to parquet the data is processed
+    we convert from one row per document to one row per citation."""
 
+    filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
     if args.miniature_dataset:
         filepaths = filepaths[:args.miniature_dataset_size]
-    datalen = len(filepaths)
-    fname = args.data_dir[:-1] + "_len_" + str(datalen) + ".parquet"
-    df = None
-    if not os.path.exists(fname):
-        print("reading json files into df")
-        for file in tqdm.tqdm(filepaths):
+
+    print("reading json files into df")
+    # create batches of files
+    filebatchsize=100
+    batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
+    tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
+    os.makedirs(tmp_dir_name)
+    for i in tqdm.tqdm(range(len(batches))):
+        df = None
+        batch = batches[i]
+        for file in batch:
             data = pd.read_json(file, lines=True) # read data frame from json file
             data = preprocess_data(data)  # expensive operation
             if df is None:
                 df = data
             else:
                 df = pd.concat([df, data], copy=False, ignore_index=True)
-
-        print("finished converting to df")
-        df = df.to_parquet(fname, compression=None)
-        print("saved df to parquet", fname)
+        batch_fp = tmp_dir_name + "batch_" + str(i) + ".parquet"
+        print("finished converting batch nr. ", str(i), "to df")
+        df = df.to_parquet(batch_fp, compression=None)
+    # rename folder from tmp_dir_name to data_dir_name
+    os.rename(tmp_dir_name, data_dir_name)
+    print("saved df to parquet", data_dir_name)
     
-    del df
-    print("parquet file already exists, loading from parquet...")
-    df = datasets.load_dataset("parquet", data_files=fname)
+
+def parquet_to_dataset(parquet_dir):
+    parquet_files = [os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir) if f.endswith('.parquet')]
+    df = datasets.load_dataset("parquet", data_files=parquet_files)
     df = df['train']  # load_datasets makes this necessary
     return df
 
@@ -103,7 +114,21 @@ def preprocess_data(df):
 def load_dataset(passedargs):
     global args
     args = passedargs
-    df = dataset_from_disk(args)
+    
+    # determine name of dataset based on args
+    length_str = "all" 
+    if args.miniature_dataset:
+        length_str = str(args.miniature_dataset_size)
+    assert args.data_dir[-1] == "/", "data_dir must end with '/'"
+    data_dir_name = args.data_dir[:-1] + "_len_" + length_str + "/"
+
+    # create parquet files from raw data if not already done
+    if not os.path.exists(data_dir_name):
+        preprocess_json_and_save_to_parquet(data_dir_name, args)
+    else:
+        print("parquet file already exists, loading parquet...")
+
+    df = parquet_to_dataset(data_dir_name)    
     df = df.train_test_split(test_size=0.2)
     return df
     
