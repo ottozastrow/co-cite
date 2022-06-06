@@ -87,8 +87,7 @@ model.compile(optimizer=optimizer)
 wandb_callback = WandbCallback(save_model=not args.debug)
 
 if not args.notraining:
-    assert args.debug
-    model.fit(x=tf_test_set, validation_data=tf_test_set, epochs=args.epochs,
+    model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs,
               callbacks=[
                     wandb_callback,
                     metric_test_callback, 

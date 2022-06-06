@@ -7,6 +7,8 @@ import tensorflow as tf
 from packaging.version import parse
 from tensorflow.keras.callbacks import Callback
 
+import wandb
+
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +235,7 @@ class KerasMetricCallback(Callback):
         # in the logs argument. Ordinarily, this is so the callback can read them, but in this case we write a bunch of
         # new keys in there, which will then get read by the History callback and treated like any other metric value.
         # I promise that I have it in writing from Chollet that this is okay.
+        wandb.log(metric_output)
         logs.update(metric_output)
     
 
