@@ -73,6 +73,7 @@ class KerasMetricCallback(Callback):
         num_beams: Optional[int] = 1,
     ):
         super().__init__()
+        self.step_num = 0
         self.metric_fn = metric_fn
         self.batch_size = batch_size
         if not isinstance(eval_dataset, tf.data.Dataset):
@@ -84,6 +85,7 @@ class KerasMetricCallback(Callback):
             # Wrap a tf.data.Dataset around it
             eval_dataset = tf.data.Dataset.from_tensor_slices(eval_dataset).batch(batch_size, drop_remainder=False)
         self.eval_dataset = eval_dataset
+        self.log_interval = max(2, len(self.eval_dataset) // 10)
         self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
         self.num_beams = num_beams
@@ -237,7 +239,11 @@ class KerasMetricCallback(Callback):
         # I promise that I have it in writing from Chollet that this is okay.
         wandb.log(metric_output)
         logs.update(metric_output)
-    
+
+    def on_train_batch_end(self, batch, logs=None):
+        if self.step_num % self.log_interval == 0:
+            self.on_epoch_end(0, logs=logs)
+        self.step_num += 1
 
 def mean_over_metrics_batches(metric_outputs):
     # iterate through keys and items in metric_outputs and compute mean

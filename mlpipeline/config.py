@@ -1,5 +1,4 @@
 import argparse
-import os
 
 
 def cmd_arguments():
@@ -22,11 +21,10 @@ def cmd_arguments():
                         default="../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
     args = parser.parse_args()
 
-
     if args.debug:
         args.miniature_dataset = True
         args.miniature_dataset_size = 1
-        args.batchsize = 3
+        args.batchsize = 2
         args.epochs = 1
-        args.wandb_mode = "disabled"
+        # args.wandb_mode = "disabled"
     return args
