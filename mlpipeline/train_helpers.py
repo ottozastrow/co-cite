@@ -46,7 +46,7 @@ class CustomMetrics():
         # pdb.set_trace()
         logits = data[0]['logits']
         labels = data[1]['labels']
-        top_ks = [1, 3, 5]
+        top_ks = [1, 2] #, 3, 5]
         max_k = max(top_ks)
         # beam search start timeit
         start = timeit.default_timer()
