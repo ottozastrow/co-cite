@@ -23,8 +23,8 @@ def cmd_arguments():
 
     if args.debug:
         args.miniature_dataset = True
-        args.miniature_dataset_size = 1
-        args.batchsize = 2
-        args.epochs = 10
+        args.miniature_dataset_size = 4
+        args.batchsize = 6
+        args.epochs = 2
         # args.wandb_mode = "disabled"
     return args

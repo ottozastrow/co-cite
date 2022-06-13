@@ -44,7 +44,8 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
     collate_fn=data_collator,
     
 )
-num_demo_samples = min(100, args.miniature_dataset_size//50+2)
+num_demo_samples = min(50, args.miniature_dataset_size//50+2)  # range between 2 and 50
+num_demo_samples = min(len(tokenized_datasets["test"]), num_demo_samples) # but <= len(ds)
 generation_test_dataset = (
     tokenized_datasets["test"]
     .shuffle()
@@ -72,14 +73,16 @@ generation_train_dataset = (
 metric_fn_test = CustomMetrics(prefix="test_", tokenizer=tokenizer, model=model, args=args).fast_metrics
 metric_fn_train = CustomMetrics(prefix="train_", tokenizer=tokenizer, model=model, args=args).fast_metrics
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
-    metric_fn=metric_fn_test, 
-    eval_dataset=tf_test_set, prefix="test_",
-    predict_with_generate=False, num_beams=3, batch_size=args.batchsize,
+    tokenizer=tokenizer,
+    metric_fn=metric_fn_test,
+    eval_dataset=generation_test_dataset, prefix="test_",
+    predict_with_generate=True, args=args, batch_size=args.batchsize,
 )
 metric_train_callback = keras_metric_callback.KerasMetricCallback(
-    metric_fn=metric_fn_train, 
-    eval_dataset=tf_train_set, prefix="train_",
-    predict_with_generate=False, num_beams=3, batch_size=args.batchsize,
+    tokenizer=tokenizer,
+    metric_fn=metric_fn_train,
+    eval_dataset=generation_train_dataset, prefix="train_",
+    predict_with_generate=True, args=args, batch_size=args.batchsize,
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
 model.compile(optimizer=optimizer)
@@ -96,14 +99,14 @@ if not args.notraining:
 
 ### evaluate model
 if not args.noevaluation:
-    metric_fn_test = train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args)
-    metric_fn_train = train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args)
+    # metric_fn_test = train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args)
+    # metric_fn_train = train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args)
     for batch in generation_test_dataset:
         inputs = batch["input_ids"]
         labels = batch["labels"]
         predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
                                     output_scores=True, return_dict_in_generate=True)
-        results = metric_fn_test((predictions, labels), topk=args.topk)
+        results = metric_fn_test((predictions, labels))
         print({'eval_test': results})
         wandb.log({'eval_test': results})
 
@@ -112,6 +115,6 @@ if not args.noevaluation:
         labels = batch["labels"]
         predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
                                     output_scores=True, return_dict_in_generate=True)
-        results = metric_fn_test((predictions, labels), topk=args.topk)
+        results = metric_fn_test((predictions, labels))
         print({'eval_train': results})
         wandb.log({'eval_train': results})

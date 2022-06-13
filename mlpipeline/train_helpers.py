@@ -15,7 +15,45 @@ from transformers import (
     MaxLengthCriteria,
     BeamSearchScorer
 )
-import pdb
+
+
+def split_citation_segments(inputs):
+    books = ["U.S.C.A", "C.F.R."]
+    normalize = lambda x: x.lower().replace(" ", "")
+    books_normed = [normalize(book) for book in books]
+
+    splits = inputs.split(",")
+    # if any book normed appears in the citation
+    if any([book in normalize(splits[0]) for book in books_normed]):
+        txt = [segment.strip().lower() for segment in splits]
+    else:
+        txt = [inputs]
+    return txt
+
+
+def citation_segment_acc(predictions, labels):
+    """
+    converts from list of strings of this kind
+    38 U.S.C.A. 5100, 5102, 5103, 5103A, 5106, 5107
+    to list of list of strings such that
+    [38 U.S.C.A. 5100, 38 U.S.C.A. 5102, ...]
+
+    then computes acc accross both
+    
+    """
+    accs = []
+    for i in range(len(labels)):
+        x = predictions[i]
+        y = labels[i]
+        x = split_citation_segments(x)
+        y = split_citation_segments(y)
+        # compute accuracy
+        # for every el in y, check if x has el
+        contained = [el in x for el in y]
+        sample_acc = np.mean(contained)
+        accs.append(sample_acc)
+    batch_acc = np.mean(accs)
+    return batch_acc
 
 
 def logits_to_topk(logits, k):
@@ -41,24 +79,28 @@ class CustomMetrics():
         self.model = model
         self.args = args
 
-    def fast_metrics(self, data):
-        # import pdb
-        # pdb.set_trace()
-        logits = data[0]['logits']
-        labels = data[1]['labels']
-        top_ks = [1, 2] #, 3, 5]
-        max_k = max(top_ks)
-        # beam search start timeit
-        start = timeit.default_timer()
-        beams, log_probs = logits_to_topk(logits, max_k)
-        # stop timeit
-        stop = timeit.default_timer()
-        print("Beam search time: {}".format(stop - start))
+    def fast_metrics(self, tupledict):
+        """
+        beams is a list of 2d tensors k x batch_size x seq_len"""
+        beams = tupledict[0]["sequences"]
+        # if beams not type list
+        if not isinstance(beams, list):
+            beams = [beams]
+        labels = tupledict[1]
 
+        results = self.accuracy_at_k(self, beams, labels)
+        results[self.prefix + "segment_accuracy"] = citation_segment_acc(beams, labels)
+        return results
+    
+    def accuracy_at_k(self, beams, labels):
         ### accuracies
         # correctness of batchsize x beam_index
-        # start acc timeit
-        start = timeit.default_timer()
+        top_ks = [1, 3, 5, 20]
+        max_k = max(top_ks)
+        max_k = min(max_k, len(beams)) 
+        top_ks = [k for k in top_ks if k <= max_k]
+
+        beams = [tf.cast(beam,tf.int64) for beam in beams]  # from int32
         match_at_k = np.zeros((len(beams), len(labels)))
         results = {}
         for i in range(len(beams)):
@@ -81,13 +123,8 @@ class CustomMetrics():
         for k in top_ks:
             topk_acc = np.mean(np.any(match_at_k[:k, :], axis=0))
             results[self.prefix + "top{}_acc".format(k)] = topk_acc
-        # stop acc timeit
-        stop = timeit.default_timer()
-        print("Accuracy time: {}".format(stop - start))
 
-        # scores
-        scores = log_probs[:, -1].numpy()
-        return results, list(match_at_k[0]), list(scores)
+        return results, list(match_at_k[0])
 
 
 def plot_precision_recall(preds, scores, targets, buckets=40):
@@ -128,6 +165,13 @@ def batch_accuracy(predictions, labels):
 
     return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
 
+def tokens_2_words(tokenizer, predictions, labels):
+    predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
+    decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+    ### sample outputs
+    return decoded_labels, decoded_predictions
 
 def create_metrics_fn(prefix, tokenizer, model, args, fast_metrics_only=False):
     """Function that computes all metrics for the given dataset.
@@ -151,10 +195,13 @@ def create_metrics_fn(prefix, tokenizer, model, args, fast_metrics_only=False):
         if not fast_metrics_only:
             predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
             decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-            print("finished decoding predictions")
             decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-            print("finished decoding labels")
 
+            ### sample outputs
+            my_table = wandb.Table(columns=["prediction", "groundtruth"], 
+            data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
+            wandb.log({prefix + "demo": my_table})
+            
             ### Compute ROUGE
             # measure time with timeit
             # if topk == 1:
@@ -165,23 +212,19 @@ def create_metrics_fn(prefix, tokenizer, model, args, fast_metrics_only=False):
             #     results =  {(prefix + key): value.mid.fmeasure * 100 for key, value in result.items()}
             #     wandb.log({prefix + "rouge": results})
             
-            ### sample outputs
-            my_table = wandb.Table(columns=["prediction", "groundtruth"], 
-            data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
-            wandb.log({prefix + "demo": my_table})
 
         ### accuracy
-        if topk != 1:
-            accuracy_per_sample = []
-            for i in range(topk):
-                accuracy_per_sample.append(batch_accuracy(predictions[i], labels))
+        # if topk != 1:
+        #     accuracy_per_sample = []
+        #     for i in range(topk):
+        #         accuracy_per_sample.append(batch_accuracy(predictions[i], labels))
             
-            results[prefix + 'acc_top' + str(topk)] = np.mean(np.array(accuracy_per_sample))
-            wandb.log({prefix + 'acc_top' + str(topk): results[prefix + 'acc_top' + str(topk)]})
+        #     results[prefix + 'acc_top' + str(topk)] = np.mean(np.array(accuracy_per_sample))
+        #     wandb.log({prefix + 'acc_top' + str(topk): results[prefix + 'acc_top' + str(topk)]})
         
-        results[prefix + 'acc'] = batch_accuracy(predictions[0], labels)
+        # results[prefix + 'acc'] = batch_accuracy(predictions[0], labels)
     
-        wandb.log({prefix + "accuracy": results[prefix + 'acc']})
+        # wandb.log({prefix + "accuracy": results[prefix + 'acc']})
 
 
         return results

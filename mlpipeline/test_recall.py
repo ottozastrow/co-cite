@@ -1,37 +1,36 @@
 import numpy as np
 
-import matplotlib.pyplot as plt
-length = 100
-preds = np.random.randint(2, size=length)
-scores = np.random.uniform(-10, 1, length)
-targets = np.random.randint(2, size=length)
+
+from keras_metric_callback import plot_precision_recall, citation_segment_acc, split_citation_segments
+from cocitedata import load_dataset
+
+from config import cmd_arguments
+args = cmd_arguments()
+ds = load_dataset(args)["train"]
+texts, labels = ds['text'], ds['label']
+
+def test_plot_precision_recall():
+    length = 100
+    preds = np.random.randint(2, size=length)
+    scores = np.random.uniform(-10, 1, length)
+    targets = np.random.randint(2, size=length)
+    plot_precision_recall(preds, scores, targets)
+    assert True
+
+def test_metrics():
+
+    accs = citation_segment_acc(labels, labels)
+    assert accs == 1.0
+    accs = citation_segment_acc(["" for i in range(len(labels))], labels)
+    assert accs == 0.0
+
+    # accs = citation_segment_acc(["" for i in range(len(labels))], labels)
 
 
-def plot_precision_recall(preds, scores, targets, buckets=40):
-    matches = preds == targets
-    # create thresholds
-    min, max = np.min(scores), np.max(scores)
-    thresholds = np.linspace(min, max, buckets)
+    x = ["38 C.F.R. 3.303,"]
+    y = ["38 C.F.R. 3.303, 3.310"]
+    accs = citation_segment_acc(x, y)
+    assert accs == 0.5, accs
 
-    # for every threshold, compute the precision
-    precisions = []
-    for threshold in thresholds:
-        # compute the number of true positives
-        true_positives = np.sum(matches & (scores >= threshold))
-        # compute the number of false positives
-        false_positives = np.sum((preds != targets) & (scores >= threshold))
-        # compute the precision
-        precision = true_positives / (true_positives + false_positives)
-        # append the precision to the list of precisions
-        precisions.append(precision)
-
-    # plot curve
-    plt.plot(thresholds, precisions)
-    # yaxsis, xaxis, title
-    plt.xlabel('Threshold')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-
-    wandb.log({"precision_recall": plt})
-
-plot_precision_recall(preds, scores, targets)
+    
+test_metrics()

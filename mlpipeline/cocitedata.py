@@ -111,7 +111,7 @@ def preprocess_data(df):
     return df_pairs
 
 
-def load_dataset(passedargs):
+def load_dataset(passedargs, split=True):
     global args
     args = passedargs
     
@@ -128,7 +128,8 @@ def load_dataset(passedargs):
     else:
         print("parquet file already exists, loading parquet...")
 
-    df = parquet_to_dataset(data_dir_name)    
-    df = df.train_test_split(test_size=0.1)
+    df = parquet_to_dataset(data_dir_name)
+    if split:
+        df = df.train_test_split(test_size=0.1)
     return df   
     

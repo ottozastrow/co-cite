@@ -9,6 +9,9 @@ from packaging.version import parse
 from tensorflow.keras.callbacks import Callback
 import matplotlib.pyplot as plt
 import wandb
+import timeit
+
+import train_helpers
 
 
 logger = logging.getLogger(__name__)
@@ -67,18 +70,21 @@ class KerasMetricCallback(Callback):
         self,
         metric_fn: Callable,
         eval_dataset: Union[tf.data.Dataset, np.ndarray, tf.Tensor, tuple, dict],
+        tokenizer,
         output_cols: Optional[List[str]] = None,
         label_cols: Optional[List[str]] = None,
         batch_size: Optional[int] = None,
         predict_with_generate: Optional[bool] = False,
-        num_beams: Optional[int] = 1,
         prefix: Optional[str] = None,
+        args: Optional[int] = 1,
     ):
         super().__init__()
         self.step_num = 0
         self.metric_fn = metric_fn
+        self.tokenizer = tokenizer
         self.batch_size = batch_size
         self.prefix = prefix
+        self.args = args
         if not isinstance(eval_dataset, tf.data.Dataset):
             if batch_size is None:
                 raise ValueError(
@@ -91,7 +97,6 @@ class KerasMetricCallback(Callback):
         self.log_interval = max(10, len(self.eval_dataset) // 10)
         self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
-        self.num_beams = num_beams
         # This next block attempts to parse out which elements of the dataset should be appended to the labels list
         # that is passed to the metric_fn
         if isinstance(eval_dataset.element_spec, tuple) and len(eval_dataset.element_spec) == 2:
@@ -186,6 +191,7 @@ class KerasMetricCallback(Callback):
         metric_outputs = []
         all_matches = []  # stores whether each prediction matches the label for each citation
         all_scores = []
+        samples_table = []  # stores rows with detokenized generated samples and labels
         # The whole predict/generate loop is handled inside this method
         for batch in self.eval_dataset:
             if isinstance(batch, tuple):
@@ -200,7 +206,7 @@ class KerasMetricCallback(Callback):
                     generation_inputs = batch
                     attention_mask = None
 
-                predictions = self.model.generate(generation_inputs, sample=True, num_beams=self.num_beams, num_return_sequence=self.num_beams, output_scores=True, return_dict_in_generate=True)
+                predictions = self.model.generate(generation_inputs, sample=True, num_beams=self.args.topk, num_return_sequence=self.args.topk, output_scores=True, return_dict_in_generate=True)
             else:
                 predictions = self.model.predict(batch)
                 if isinstance(predictions, dict):
@@ -226,13 +232,36 @@ class KerasMetricCallback(Callback):
 
             # all_preds = self._postprocess_predictions_or_labels(prediction_list)
             # all_labels = self._postprocess_predictions_or_labels(label_list)
+            # beam search start timeit
 
-            metric_output, matches, scores = self.metric_fn((predictions, labels))
+            start = timeit.default_timer()
+            labels = labels["labels"]
+            if self.predict_with_generate:
+                metric_output, matches = self.metric_fn((predictions, labels))
+                scores = list(predictions["scores"].numpy())
+            else:
+                logits = predictions['logits']
+                beams, log_probs = train_helpers.logits_to_topk(
+                    logits, self.args.topk)
+                # stop timeit
+                stop = timeit.default_timer()
+                print("Beam search time: {}".format(stop - start))
+                metric_output, matches = self.metric_fn((predictions, labels))
+                scores = list(log_probs[:, -1].numpy())
+
             all_matches += matches
             all_scores += scores
 
             metric_outputs.append(metric_output)
+            decoded_labels, decoded_predictions = train_helpers.tokens_2_words(
+                self.tokenizer, predictions["sequences"], labels)
+            
+            rows=[list(t) for t in zip(decoded_predictions, decoded_labels)]
+            samples_table += rows
         
+        wandb_table = wandb.Table(columns=["prediction", "label"], data=samples_table)
+        wandb.log({self.prefix + "demo": wandb_table})
+
         metric_output = mean_over_metrics_batches(metric_outputs)
         all_matches = np.array(all_matches).astype(int)
         all_scores = np.array(all_scores)
@@ -295,3 +324,6 @@ def mean_over_metrics_batches(metric_outputs):
     # translate metric_outputs back to dict
     metric_output = {key: val for key, val in zip(keys_list, np_metric_output)}
     return metric_output
+
+
+
