@@ -22,7 +22,7 @@ def split_citation_segments(inputs):
     normalize = lambda x: x.lower().replace(" ", "")
     books_normed = [normalize(book) for book in books]
 
-    splits = inputs.split(",")
+    splits = inputs.as_string().split(",")
     # if any book normed appears in the citation
     if any([book in normalize(splits[0]) for book in books_normed]):
         txt = [segment.strip().lower() for segment in splits]
