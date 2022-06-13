@@ -21,8 +21,8 @@ def split_citation_segments(inputs):
     books = ["U.S.C.A", "C.F.R."]
     normalize = lambda x: x.lower().replace(" ", "")
     books_normed = [normalize(book) for book in books]
+    splits = inputs.split(",")
 
-    splits = tf.strings.as_string(inputs).split(",")
     # if any book normed appears in the citation
     if any([book in normalize(splits[0]) for book in books_normed]):
         txt = [segment.strip().lower() for segment in splits]
@@ -88,11 +88,6 @@ class CustomMetrics():
             beams = [beams]
         labels = tupledict[1]
 
-        results = self.accuracy_at_k(beams, labels)
-        results[self.prefix + "segment_accuracy"] = citation_segment_acc(beams, labels)
-        return results
-    
-    def accuracy_at_k(self, beams, labels):
         ### accuracies
         # correctness of batchsize x beam_index
         top_ks = [1, 3, 5, 20]

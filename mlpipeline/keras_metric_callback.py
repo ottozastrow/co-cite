@@ -252,10 +252,12 @@ class KerasMetricCallback(Callback):
             all_matches += matches
             all_scores += scores
 
-            metric_outputs.append(metric_output)
             decoded_labels, decoded_predictions = train_helpers.tokens_2_words(
                 self.tokenizer, predictions["sequences"], labels)
+            metric_output[self.prefix + "segment_accuracy"] = train_helpers.citation_segment_acc(
+                decoded_predictions, decoded_labels)
             
+            metric_outputs.append(metric_output)
             rows=[list(t) for t in zip(decoded_predictions, decoded_labels)]
             samples_table += rows
         
