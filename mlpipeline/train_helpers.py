@@ -88,7 +88,7 @@ class CustomMetrics():
             beams = [beams]
         labels = tupledict[1]
 
-        results = self.accuracy_at_k(self, beams, labels)
+        results = self.accuracy_at_k(beams, labels)
         results[self.prefix + "segment_accuracy"] = citation_segment_acc(beams, labels)
         return results
     
