@@ -96,7 +96,7 @@ callbacks = [
     metric_train_callback,
 ]
 
-if args.debug:
+if not args.debug:
     modelsave_dir="./model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
     modelsave_dir += "debug/" if args.debug else ""
     save_model_callback = SaveModelCallback(modelsave_dir, model=model, tokenizer=tokenizer)
