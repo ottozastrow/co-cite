@@ -6,9 +6,9 @@ def cmd_arguments(debug=False):
     parser.add_argument("--modelname", help="name on huggingface model hub", default="t5-small")
     parser.add_argument("--wandb_mode", help="online, offline or disabled mode for wandb logging", default="online")
     parser.add_argument("--epochs", type=int, help="number of epochs", default=5)
-    parser.add_argument("--batchsize", type=int, help="batch size", default=16)
-    parser.add_argument("--contextlength", type=int, help="context length", default=300)
-    parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
+    parser.add_argument("--batchsize", type=int, help="batch size", default=8)
+    parser.add_argument("--contextlength", type=int, help="context length", default=1000)
+    parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=1)
     parser.add_argument("--miniature_dataset", 
                         help="for debugging only use 20 samples", action="store_true")
     parser.add_argument("--notraining", help="skip training pipeline", action="store_true")

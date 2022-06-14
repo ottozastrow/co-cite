@@ -82,7 +82,7 @@ def get_citation_context(x):
     """Extract inputs and targets from a dataframe row"""
     inputs = []
     targets = []
-    contextlength = 1000
+    contextlength = args.contextlength
     indexes = find_all_indexes(x['txt'], "@cit@")  # TODO replace compuationally iniefficient method
     
     for i in range(len(x['citation_vocab'])):
@@ -125,7 +125,7 @@ def create_tokenize_function(tokenizer):
     def tokenize_function(examples):
             inputs = [input for input in examples['text']]
             targets = [target for target in examples['label']]
-            model_inputs = tokenizer(inputs, max_length=128, truncation=True, padding="max_length")
+            model_inputs = tokenizer(inputs, max_length=256, truncation=True, padding="max_length")
 
             with tokenizer.as_target_tokenizer():
                 labels = tokenizer(targets, max_length=32, truncation=True, padding="max_length")
