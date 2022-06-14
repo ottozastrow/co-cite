@@ -84,7 +84,7 @@ metric_train_callback = keras_metric_callback.KerasMetricCallback(
     eval_dataset=generation_train_dataset, prefix="train_",
     predict_with_generate=True, args=args, batch_size=args.batchsize,
 )
-optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)
+optimizer = AdamWeightDecay(learning_rate=1e-4, weight_decay_rate=0.01)  # TODO warning high lr
 model.compile(optimizer=optimizer)
 
 wandb_callback = WandbCallback(save_model=not args.debug)
