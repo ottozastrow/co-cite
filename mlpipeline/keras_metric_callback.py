@@ -278,8 +278,6 @@ class KerasMetricCallback(Callback):
         # new keys in there, which will then get read by the History callback and treated like any other metric value.
         # I promise that I have it in writing from Chollet that this is okay.
         wandb.log(metric_output)
-        import pdb
-        pdb.set_trace()
         logs.update(metric_output)
 
     def on_train_batch_end(self, batch, logs=None):
