@@ -94,8 +94,6 @@ def get_citation_context(x):
             inputs.append(context)
             targets.append(citation)
         except:
-            import pdb
-            pdb.set_trace()
             print("skip citation", i, indexes)
 
     x['inputs'] = inputs
