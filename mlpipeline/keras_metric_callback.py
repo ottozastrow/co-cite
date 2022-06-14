@@ -94,7 +94,7 @@ class KerasMetricCallback(Callback):
             # Wrap a tf.data.Dataset around it
             eval_dataset = tf.data.Dataset.from_tensor_slices(eval_dataset).batch(batch_size, drop_remainder=False)
         self.eval_dataset = eval_dataset
-        self.log_interval = max(10, len(self.eval_dataset) // 10)
+        self.log_interval = max(5, len(self.eval_dataset) // 50)
         self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
         # This next block attempts to parse out which elements of the dataset should be appended to the labels list
