@@ -92,6 +92,8 @@ class CustomMetrics():
         if not isinstance(beams, list):
             beams = [beams]
         labels = tupledict[1]
+        # convert beams from int32 to int64
+        beams = [tf.cast(b, tf.int64) for b in beams]
                 
         ### accuracies
         # correctness of batchsize x beam_index

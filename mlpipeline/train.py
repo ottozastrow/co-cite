@@ -1,3 +1,4 @@
+from cProfile import run
 from config import cmd_arguments
 args = cmd_arguments()
 
@@ -6,7 +7,8 @@ import numpy as np
 from wandb.keras import WandbCallback
 
 # from transformers.keras_callbacks import KerasMetricCallback
-from transformers import AutoTokenizer, DataCollatorForSeq2Seq, TFAutoModelForSeq2SeqLM, AdamWeightDecay
+from transformers import DataCollatorForSeq2Seq, TFAutoModelForSeq2SeqLM, AdamWeightDecay
+from transformers.keras_callbacks import PushToHubCallback
 
 import cocitedata
 import train_helpers
@@ -87,12 +89,18 @@ model.compile(optimizer=optimizer)
 
 wandb_callback = WandbCallback(save_model=not args.debug)
 
+push_to_hub_callback = PushToHubCallback(
+    output_dir="./model_save",
+    tokenizer=tokenizer,
+    hub_model_id="cocite"
+)
 if not args.notraining:
     model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs,
               callbacks=[
                     wandb_callback,
                     metric_test_callback, 
-                    metric_train_callback
+                    metric_train_callback,
+                    # push_to_hub_callback
               ])
 
 ### evaluate model

@@ -9,6 +9,7 @@
 **/wandb/
 **/mlruns/
 **/results/
+**/model_save/
 mlpipeline/huggingface_cache/
 # Byte-compiled / optimized / DLL files
 __pycache__/
