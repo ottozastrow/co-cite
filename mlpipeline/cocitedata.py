@@ -51,6 +51,10 @@ def preprocess_json_and_save_to_parquet(data_dir_name, args):
         print("finished converting batch nr. ", str(i), "to df")
         df = df.to_parquet(batch_fp, compression=None)
     # rename folder from tmp_dir_name to data_dir_name
+    # delete data_dir_name if it exists
+    if os.path.exists(data_dir_name):
+        os.system("rm -r " + data_dir_name)
+    
     os.rename(tmp_dir_name, data_dir_name)
     print("saved df to parquet", data_dir_name)
     
