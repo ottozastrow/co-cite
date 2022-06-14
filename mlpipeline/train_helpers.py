@@ -1,5 +1,5 @@
 import numpy as np
-import pdb
+import os
 import tensorflow as tf
 from tensorflow.nn import ctc_beam_search_decoder
 import timeit
@@ -92,8 +92,8 @@ class CustomMetrics():
         if not isinstance(beams, list):
             beams = [beams]
         labels = tupledict[1]
-        # convert beams from int32 to int64
-        beams = [tf.cast(b, tf.int64) for b in beams]
+        # convert labels from tf int64 to int32
+        labels = tf.cast(labels, tf.int32)
                 
         ### accuracies
         # correctness of batchsize x beam_index
@@ -128,6 +128,20 @@ class CustomMetrics():
             results[self.prefix + "top{}_acc".format(k)] = topk_acc
 
         return results, list(match_at_k[0])
+
+
+class SaveModelCallback(tf.keras.callbacks.Callback):
+    def __init__(self, save_path, model, tokenizer):
+        self.save_path = save_path
+        self.model = model
+        self.tokenizer = tokenizer
+    def on_epoch_end(self, epoch, logs=None):
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
+        name = self.save_path + "epoch_" + str(epoch)
+        self.model.save_pretrained(name)
+        self.tokenizer.save_pretrained(name)
+        print("Saved model and toknizer to {}".format(name))
 
 
 def plot_precision_recall(preds, scores, targets, buckets=40):

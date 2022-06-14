@@ -13,7 +13,7 @@ from transformers.keras_callbacks import PushToHubCallback
 import cocitedata
 import train_helpers
 import keras_metric_callback
-from train_helpers import CustomMetrics
+from train_helpers import CustomMetrics, SaveModelCallback
 
 import wandb
 
@@ -89,19 +89,22 @@ model.compile(optimizer=optimizer)
 
 wandb_callback = WandbCallback(save_model=not args.debug)
 
-push_to_hub_callback = PushToHubCallback(
-    output_dir="./model_save",
-    tokenizer=tokenizer,
-    hub_model_id="cocite"
-)
+
+callbacks = [
+    wandb_callback,
+    metric_test_callback, 
+    metric_train_callback,
+]
+
+if args.debug:
+    modelsave_dir="./model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
+    modelsave_dir += "debug/" if args.debug else ""
+    save_model_callback = SaveModelCallback(modelsave_dir, model=model, tokenizer=tokenizer)
+    callbacks.append(save_model_callback)
+
+
 if not args.notraining:
-    model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs,
-              callbacks=[
-                    wandb_callback,
-                    metric_test_callback, 
-                    metric_train_callback,
-                    # push_to_hub_callback
-              ])
+    model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs,callbacks=callbacks)
 
 ### evaluate model
 if not args.noevaluation:
