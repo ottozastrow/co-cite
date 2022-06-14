@@ -92,8 +92,8 @@ class CustomMetrics():
         if not isinstance(beams, list):
             beams = [beams]
         labels = tupledict[1]
-        # convert labels from tf int64 to int32
-        labels = tf.cast(labels, tf.int32)
+        # convert beam from int32 to int64
+        beams = [tf.cast(beam, tf.int64) for beam in beams]
                 
         ### accuracies
         # correctness of batchsize x beam_index
@@ -108,15 +108,13 @@ class CustomMetrics():
             batch_accs = []
             beam = beams[i]
             for j in range(len(labels)):  # iterate through batch
-                beam_length = min(
-                    np.count_nonzero(beam[j]), 
-                    np.count_nonzero(labels[j]))
-                
-                cropped_beam = beam[j][:beam_length]
-                cropped_label = labels[j][:beam_length]
 
-                matches = cropped_beam == cropped_label
-                exact_match = all(matches)
+                if len(beam[j]) != len(labels[j]):
+                    exact_match = False
+                else:
+                    matches = beam[j] == labels[j]
+                    exact_match = all(matches)
+
                 batch_accs.append(exact_match)
                 match_at_k[i, j] = exact_match
             if i == 0:
