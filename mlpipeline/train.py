@@ -17,15 +17,13 @@ import wandb
 
 wandb.init(project="cocite", config=args, mode=args.wandb_mode)
 
-dataset = cocitedata.load_dataset(args)
+tokenized_datasets, dataset, tokenizer = cocitedata.load_dataset(args)
+del dataset  # untokenized version
 
 # initialize model
 model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname)
-tokenizer = AutoTokenizer.from_pretrained(args.modelname)
 
-tokenized_datasets = dataset.map(
-    train_helpers.create_tokenize_function(tokenizer), batched=True)
-tokenized_datasets = tokenized_datasets.remove_columns(dataset["train"].column_names)
+# tokenized_datasets = tokenized_datasets.remove_columns(dataset["train"].column_names)
 # tokenized_datasets = tokenized_datasets.remove_columns(dataset["test"].column_names)
 
 data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, return_tensors="tf")
@@ -70,8 +68,8 @@ generation_train_dataset = (
 )
 
 
-metric_fn_test = CustomMetrics(prefix="test_", tokenizer=tokenizer, model=model, args=args).fast_metrics
-metric_fn_train = CustomMetrics(prefix="train_", tokenizer=tokenizer, model=model, args=args).fast_metrics
+metric_fn_test = CustomMetrics(prefix="test_", args=args).fast_metrics
+metric_fn_train = CustomMetrics(prefix="train_", args=args).fast_metrics
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
     tokenizer=tokenizer,
     metric_fn=metric_fn_test,
@@ -99,8 +97,6 @@ if not args.notraining:
 
 ### evaluate model
 if not args.noevaluation:
-    # metric_fn_test = train_helpers.create_metrics_fn(prefix="test_", tokenizer=tokenizer, model=model, args=args)
-    # metric_fn_train = train_helpers.create_metrics_fn(prefix="train_", tokenizer=tokenizer, model=model, args=args)
     for batch in generation_test_dataset:
         inputs = batch["input_ids"]
         labels = batch["labels"]

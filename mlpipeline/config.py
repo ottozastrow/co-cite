@@ -1,7 +1,7 @@
 import argparse
 
 
-def cmd_arguments():
+def cmd_arguments(debug=False):
     parser = argparse.ArgumentParser()
     parser.add_argument("--modelname", help="name on huggingface model hub", default="t5-small")
     parser.add_argument("--wandb_mode", help="online, offline or disabled mode for wandb logging", default="online")
@@ -13,6 +13,7 @@ def cmd_arguments():
                         help="for debugging only use 20 samples", action="store_true")
     parser.add_argument("--notraining", help="skip training pipeline", action="store_true")
     parser.add_argument("--noevaluation", help="skip post training evaluation pipeline", action="store_true")
+    parser.add_argument("--rebuild_dataset", help="instead of attempting to load existing datasets rebuild it", action="store_true")
     parser.add_argument("--debug", 
                         help="make data and model tiny for fast local debugging", action="store_true")
     parser.add_argument("--miniature_dataset_size", help="max number of documents to use for building dataset", 
@@ -21,7 +22,7 @@ def cmd_arguments():
                         default="../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
     args = parser.parse_args()
 
-    if args.debug:
+    if args.debug or debug:
         args.miniature_dataset = True
         args.miniature_dataset_size = 4
         args.batchsize = 6

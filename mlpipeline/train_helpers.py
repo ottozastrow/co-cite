@@ -21,8 +21,11 @@ def split_citation_segments(inputs):
     books = ["U.S.C.A", "C.F.R."]
     normalize = lambda x: x.lower().replace(" ", "")
     books_normed = [normalize(book) for book in books]
-    splits = inputs.split(",")
-
+    # split string on comma and remove empty strings
+    if len(inputs) == 0:  # if input is an ampty string
+        splits = [""]
+    else:
+        splits = [str for str in inputs.split(",") if str != ""]
     # if any book normed appears in the citation
     if any([book in normalize(splits[0]) for book in books_normed]):
         txt = [segment.strip().lower() for segment in splits]
@@ -73,21 +76,23 @@ def logits_to_topk(logits, k):
     return beams, log_probs
 
 class CustomMetrics():
-    def __init__(self, prefix, tokenizer, model, args):
+    def __init__(self, prefix, args):
         self.prefix = prefix
-        self.tokenizer = tokenizer
-        self.model = model
         self.args = args
 
-    def fast_metrics(self, tupledict):
+    def fast_metrics(self, tupledict) -> dict:
         """
-        beams is a list of 2d tensors k x batch_size x seq_len"""
+        tupledict is a tuple of (dict(list()), list())
+        its counterintuitive but I'll keep it since the huggingface
+        library uses it as interface
+        """
+
         beams = tupledict[0]["sequences"]
-        # if beams not type list
+        # beams is a list of 2d tensors k x batch_size x seq_len
         if not isinstance(beams, list):
             beams = [beams]
         labels = tupledict[1]
-
+                
         ### accuracies
         # correctness of batchsize x beam_index
         top_ks = [1, 3, 5, 20]
@@ -95,25 +100,26 @@ class CustomMetrics():
         max_k = min(max_k, len(beams)) 
         top_ks = [k for k in top_ks if k <= max_k]
 
-        beams = [tf.cast(beam,tf.int64) for beam in beams]  # from int32
         match_at_k = np.zeros((len(beams), len(labels)))
         results = {}
         for i in range(len(beams)):
             batch_accs = []
             beam = beams[i]
-            batch_token_accs = []
             for j in range(len(labels)):  # iterate through batch
-                beam_length = np.count_nonzero(beam[j])
-                matches = beam[j][:beam_length] == labels[j][:beam_length]
-                batch_token_accs.append(np.mean(matches))
+                beam_length = min(
+                    np.count_nonzero(beam[j]), 
+                    np.count_nonzero(labels[j]))
+                
+                cropped_beam = beam[j][:beam_length]
+                cropped_label = labels[j][:beam_length]
+
+                matches = cropped_beam == cropped_label
                 exact_match = all(matches)
                 batch_accs.append(exact_match)
                 match_at_k[i, j] = exact_match
             if i == 0:
                 batch_acc = np.mean(batch_accs)
-                batch_token_acc = np.mean(batch_token_accs)
                 results[self.prefix + 'accuracy'] = batch_acc
-                results[self.prefix + 'token_accuracy'] = batch_token_acc
 
         for k in top_ks:
             topk_acc = np.mean(np.any(match_at_k[:k, :], axis=0))
@@ -224,62 +230,3 @@ def create_metrics_fn(prefix, tokenizer, model, args, fast_metrics_only=False):
 
         return results
     return metrics_fn
-
-# def create_metrics(tokenizer):
-#     """Function that is passed to Trainer to compute training metrics"""
-
-#     metric_bleu = load_metric("bleu")
-
-#     def compute_metrics(eval_preds):
-#         logits = eval_preds.predictions
-#         labels = eval_preds.label_ids
-#         # logits[0] are the outputs batch x seq_len x vocab_size
-#         # logits[1] are (TODO check) output attention masks batch input_seq_len x 512
-#         # labels is 
-
-#         ### bleu metric
-#         predictions = np.argmax(logits[0], axis=-1)
-#         results = metric_bleu.compute(predictions=[predictions], references=[labels])
-
-#         ### sequence level accuracy
-#         # first element wise comparison, if there is a single false value, then the whole sequence is wrong
-#         sample_wise_acc = np.equal(predictions, labels).all(axis=1)
-#         results["accuracy"] = np.mean(sample_wise_acc)
-
-#         ### sample outputs
-#         num_demo_samples = 5
-#         sample_outputs = tokenizer.batch_decode(
-#             predictions[:num_demo_samples], 
-#             skip_special_tokens=True,
-#             clean_up_tokenization_spaces=True)
-#         # outputs = [output.replace("@cit@", "") for output in outputs]
-#         sample_labels = tokenizer.batch_decode(
-#             labels[:num_demo_samples], 
-#             skip_special_tokens=True,
-#             clean_up_tokenization_spaces=True)
-
-#         results["sample_predictions"] = sample_outputs
-#         results["sample_groundtruths"] = sample_labels
-
-#         my_table = wandb.Table(columns=["prediction", "groundtruth"], 
-#         data=[list(t) for t in zip(sample_outputs, sample_labels)])
-#         wandb.log({"demo": my_table})
-#         results["samples"] = my_table
-#         return results
-#     return compute_metrics
-
-
-def create_tokenize_function(tokenizer):
-    """Mapping function that tokanizes all relevant dataset entries."""
-    def tokenize_function(examples):
-            inputs = [input for input in examples['text']]
-            targets = [target for target in examples['label']]
-            model_inputs = tokenizer(inputs, max_length=128, truncation=True, padding="max_length")
-
-            with tokenizer.as_target_tokenizer():
-                labels = tokenizer(targets, max_length=32, truncation=True, padding="max_length")
-
-            model_inputs["labels"] = labels["input_ids"]
-            # TODO remove unused columns here?
-            return model_inputs
-    return tokenize_function

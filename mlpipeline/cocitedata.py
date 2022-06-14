@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import tqdm
 import datasets
+from transformers import AutoTokenizer
 
 
 args = None  # put cmd arguments in here
@@ -32,6 +33,9 @@ def preprocess_json_and_save_to_parquet(data_dir_name, args):
     filebatchsize=100
     batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
     tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
+    # delete tmp dir if it exists
+    if os.path.exists(tmp_dir_name):
+        os.system("rm -r " + tmp_dir_name)
     os.makedirs(tmp_dir_name)
     for i in tqdm.tqdm(range(len(batches))):
         df = None
@@ -90,6 +94,8 @@ def get_citation_context(x):
             inputs.append(context)
             targets.append(citation)
         except:
+            import pdb
+            pdb.set_trace()
             print("skip citation", i, indexes)
 
     x['inputs'] = inputs
@@ -108,7 +114,24 @@ def preprocess_data(df):
     columns = {'text' : inputs_series,
                'label' : targets_series}
     df_pairs = pd.DataFrame(columns)
+    
     return df_pairs
+
+
+def create_tokenize_function(tokenizer):
+    """Mapping function that tokanizes all relevant dataset entries."""
+    def tokenize_function(examples):
+            inputs = [input for input in examples['text']]
+            targets = [target for target in examples['label']]
+            model_inputs = tokenizer(inputs, max_length=128, truncation=True, padding="max_length")
+
+            with tokenizer.as_target_tokenizer():
+                labels = tokenizer(targets, max_length=32, truncation=True, padding="max_length")
+
+            model_inputs["labels"] = labels["input_ids"]
+            # TODO remove unused columns here?
+            return model_inputs
+    return tokenize_function
 
 
 def load_dataset(passedargs, split=True):
@@ -123,7 +146,7 @@ def load_dataset(passedargs, split=True):
     data_dir_name = args.data_dir[:-1] + "_len_" + length_str + "/"
 
     # create parquet files from raw data if not already done
-    if not os.path.exists(data_dir_name):
+    if not os.path.exists(data_dir_name) or args.rebuild_dataset:
         preprocess_json_and_save_to_parquet(data_dir_name, args)
     else:
         print("parquet file already exists, loading parquet...")
@@ -131,5 +154,10 @@ def load_dataset(passedargs, split=True):
     df = parquet_to_dataset(data_dir_name)
     if split:
         df = df.train_test_split(test_size=0.1)
-    return df   
+    
+    tokenizer = AutoTokenizer.from_pretrained(args.modelname)
+
+    tokenized_datasets = df.map(
+        create_tokenize_function(tokenizer), batched=True)
+    return tokenized_datasets, df, tokenizer
     
