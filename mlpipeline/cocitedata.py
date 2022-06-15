@@ -128,7 +128,7 @@ def create_tokenize_function(tokenizer):
             model_inputs = tokenizer(inputs, max_length=256, truncation=True, padding="max_length")
 
             with tokenizer.as_target_tokenizer():
-                labels = tokenizer(targets, max_length=32, truncation=True, padding="max_length")
+                labels = tokenizer(targets, max_length=42, truncation=True, padding="max_length")
 
             model_inputs["labels"] = labels["input_ids"]
             # TODO remove unused columns here?
