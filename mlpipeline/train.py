@@ -44,8 +44,11 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
     collate_fn=data_collator,
     
 )
-num_demo_samples = min(50, args.miniature_dataset_size//50+2)  # range between 2 and 50
-num_demo_samples = min(len(tokenized_datasets["test"]["label"]), num_demo_samples) # but <= len(ds)
+ds_len = len(tokenized_datasets["test"]["label"])
+num_demo_samples = max(100, ds_len // 10)
+if num_demo_samples > ds_len:
+    num_demo_samples = ds_len
+
 
 generation_test_dataset = (
     tokenized_datasets["test"]
@@ -85,7 +88,7 @@ metric_train_callback = keras_metric_callback.KerasMetricCallback(
     eval_dataset=generation_train_dataset, prefix="train_",
     predict_with_generate=True, args=args, batch_size=args.batchsize,
 )
-optimizer = AdamWeightDecay(learning_rate=1e-4, weight_decay_rate=0.01)  # TODO warning high lr
+optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)  # TODO warning high lr
 model.compile(optimizer=optimizer)
 
 wandb_callback = WandbCallback(save_model=not args.debug)
