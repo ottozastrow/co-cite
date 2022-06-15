@@ -45,7 +45,8 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
     
 )
 num_demo_samples = min(50, args.miniature_dataset_size//50+2)  # range between 2 and 50
-num_demo_samples = min(len(tokenized_datasets["test"]), num_demo_samples) # but <= len(ds)
+num_demo_samples = min(len(tokenized_datasets["test"]["label"]), num_demo_samples) # but <= len(ds)
+
 generation_test_dataset = (
     tokenized_datasets["test"]
     .shuffle()

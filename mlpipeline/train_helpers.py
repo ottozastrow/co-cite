@@ -133,13 +133,24 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
         self.save_path = save_path
         self.model = model
         self.tokenizer = tokenizer
-    def on_epoch_end(self, epoch, logs=None):
+        self.counter = 0
+        self.log_interval=2
+        self.epochcounter = 0
+
+    def on_epoch_end(self, epoch, logs=None, incrase_epoch=True):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
         name = self.save_path + "epoch_" + str(epoch)
         self.model.save_pretrained(name)
         self.tokenizer.save_pretrained(name)
         print("Saved model and toknizer to {}".format(name))
+        if incrase_epoch:
+            self.epochcounter += 1
+
+    def on_train_batch_end(self, batch, logs=None):
+        self.counter += 1
+        if self.counter % self.log_interval == 0:
+            self.on_epoch_end(self.epoch, incrase_epoch=False)
 
 
 def plot_precision_recall(preds, scores, targets, buckets=40):
