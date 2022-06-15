@@ -134,7 +134,7 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
         self.model = model
         self.tokenizer = tokenizer
         self.counter = 0
-        self.log_interval=2
+        self.log_interval=10000
         self.epochcounter = 0
 
     def on_epoch_end(self, epoch, logs=None, incrase_epoch=True):
@@ -150,7 +150,7 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
     def on_train_batch_end(self, batch, logs=None):
         self.counter += 1
         if self.counter % self.log_interval == 0:
-            self.on_epoch_end(self.epoch, incrase_epoch=False)
+            self.on_epoch_end(self.epochcounter, incrase_epoch=False)
 
 
 def plot_precision_recall(preds, scores, targets, buckets=40):
