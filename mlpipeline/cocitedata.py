@@ -6,8 +6,6 @@ import datasets
 from transformers import AutoTokenizer
 
 
-args = None  # put cmd arguments in here
-
 # to simplify: use only longest string of citation variants
 def get_longest(citations):
     longest_variants = []
@@ -42,7 +40,7 @@ def preprocess_json_and_save_to_parquet(data_dir_name, args):
         batch = batches[i]
         for file in batch:
             data = pd.read_json(file, lines=True) # read data frame from json file
-            data = preprocess_data(data)  # expensive operation
+            data = preprocess_data(data, args)  # expensive operation
             if df is None:
                 df = data
             else:
@@ -59,7 +57,7 @@ def preprocess_json_and_save_to_parquet(data_dir_name, args):
     print("saved df to parquet", data_dir_name)
     
 
-def parquet_to_dataset(parquet_dir):
+def parquet_to_dataset(parquet_dir, args):
     parquet_files = [os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir) if f.endswith('.parquet')]
     df = datasets.load_dataset("parquet", data_files=parquet_files, cache_dir="huggingface_cache/datasets/")
     df = df['train']  # load_datasets makes this necessary
@@ -78,7 +76,7 @@ def find_all_indexes(txt, substr):
     return indexes
     
 
-def get_citation_context(x):
+def get_citation_context(x, args):
     """Extract inputs and targets from a dataframe row"""
     inputs = []
     targets = []
@@ -104,11 +102,13 @@ def get_citation_context(x):
     x['targets'] = targets
     return x
 
-def preprocess_data(df):
+def preprocess_data(df, args):
     df['longest_citations'] = df['citation_vocab'].apply(get_longest)
 
     # read a fixed length context around each citation
-    df = df.apply(get_citation_context, axis=1)
+    # df = df.apply(get_citation_context, axis=1)
+    # pass argument to df.apply
+    df = df.apply(get_citation_context, axis=1, args=(args,))
 
     # turn series of lists into series
     inputs_series = df['inputs'].apply(pd.Series).stack().reset_index(drop = True)
@@ -120,7 +120,7 @@ def preprocess_data(df):
     return df_pairs
 
 
-def create_tokenize_function(tokenizer):
+def create_tokenize_function(tokenizer, args):
     """Mapping function that tokanizes all relevant dataset entries."""
     def tokenize_function(examples):
             inputs = [input for input in examples['text']]
@@ -128,7 +128,7 @@ def create_tokenize_function(tokenizer):
             model_inputs = tokenizer(inputs, max_length=256, truncation=True, padding="max_length")
 
             with tokenizer.as_target_tokenizer():
-                labels = tokenizer(targets, max_length=42, truncation=True, padding="max_length")
+                labels = tokenizer(targets, max_length=args.output_tokens, truncation=True, padding="max_length")
 
             model_inputs["labels"] = labels["input_ids"]
             # TODO remove unused columns here?
@@ -136,10 +136,7 @@ def create_tokenize_function(tokenizer):
     return tokenize_function
 
 
-def load_dataset(passedargs, split=True):
-    global args
-    args = passedargs
-    
+def load_dataset(args, split=True):    
     # determine name of dataset based on args
     length_str = "all" 
     if args.miniature_dataset:
@@ -153,13 +150,15 @@ def load_dataset(passedargs, split=True):
     else:
         print("parquet file already exists, loading parquet...")
 
-    df = parquet_to_dataset(data_dir_name)
+    df = parquet_to_dataset(data_dir_name, args)
     if split:
         df = df.train_test_split(test_size=0.1)
     
     tokenizer = AutoTokenizer.from_pretrained(args.modelname)
 
     tokenized_datasets = df.map(
-        create_tokenize_function(tokenizer), batched=True)
+        create_tokenize_function(tokenizer, args=args),
+        batched=True
+    )
     return tokenized_datasets, df, tokenizer
     
