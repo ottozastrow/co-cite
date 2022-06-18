@@ -134,7 +134,7 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
         self.model = model
         self.tokenizer = tokenizer
         self.counter = 0
-        self.log_interval=10000
+        self.log_interval=20000
         self.epochcounter = 0
 
     def on_epoch_end(self, epoch, logs=None, incrase_epoch=True):

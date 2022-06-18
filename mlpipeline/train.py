@@ -44,8 +44,11 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
     collate_fn=data_collator,
     
 )
+
+# valid number between 100 and 1000
 ds_len = len(tokenized_datasets["test"]["label"])
 num_demo_samples = max(100, ds_len // 10)
+num_demo_samples = min(5000, num_demo_samples)
 if num_demo_samples > ds_len:
     num_demo_samples = ds_len
 
@@ -100,7 +103,7 @@ callbacks = [
     metric_train_callback,
 ]
 
-if not args.debug:
+if True: # not args.debug:
     modelsave_dir="./model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
     modelsave_dir += "debug/" if args.debug else ""
     save_model_callback = SaveModelCallback(modelsave_dir, model=model, tokenizer=tokenizer)
@@ -112,6 +115,7 @@ if not args.notraining:
 
 ### evaluate model
 if not args.noevaluation:
+    print("starting eval")
     for batch in generation_test_dataset:
         inputs = batch["input_ids"]
         labels = batch["labels"]
@@ -121,11 +125,11 @@ if not args.noevaluation:
         print({'eval_test': results})
         wandb.log({'eval_test': results})
 
-    for batch in generation_train_dataset:
-        inputs = batch["input_ids"]
-        labels = batch["labels"]
-        predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
-                                    output_scores=True, return_dict_in_generate=True)
-        results = metric_fn_test((predictions, labels))
-        print({'eval_train': results})
-        wandb.log({'eval_train': results})
+    # for batch in generation_train_dataset:
+    #     inputs = batch["input_ids"]
+    #     labels = batch["labels"]
+    #     predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
+    #                                 output_scores=True, return_dict_in_generate=True)
+    #     results = metric_fn_test((predictions, labels))
+    #     print({'eval_train': results})
+    #     wandb.log({'eval_train': results})
