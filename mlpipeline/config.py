@@ -33,5 +33,5 @@ def cmd_arguments(debug=False):
         args.input_tokens=8
         args.output_tokens=4
     
-        # args.wandb_mode = "disabled"
+        args.wandb_mode = "disabled"
     return args

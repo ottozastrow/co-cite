@@ -96,6 +96,7 @@ class KerasMetricCallback(Callback):
         self.eval_dataset = eval_dataset
         num_eval_batches = len(eval_dataset)
         self.log_interval = 5 if self.args.debug else (num_eval_batches * batch_size) // 10
+
         self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
         # This next block attempts to parse out which elements of the dataset should be appended to the labels list
@@ -284,6 +285,7 @@ class KerasMetricCallback(Callback):
 
     def on_train_batch_end(self, batch, logs=None):
         if self.step_num % self.log_interval == 0 and self.prefix != "train_":
+            print("log interval and step num", self.log_interval, self.step_num)
             self.on_epoch_end(0, logs=logs)
         self.step_num += 1
 
