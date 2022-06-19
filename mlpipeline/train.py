@@ -19,8 +19,7 @@ import wandb
 
 wandb.init(project="cocite", config=args, mode=args.wandb_mode)
 
-tokenized_datasets, dataset, tokenizer = cocitedata.load_dataset(args)
-del dataset  # untokenized version
+tokenized_datasets, tokenizer = cocitedata.load_dataset(args)
 
 # initialize model
 model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname)

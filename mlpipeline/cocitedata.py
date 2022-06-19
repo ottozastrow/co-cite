@@ -4,6 +4,7 @@ import pandas as pd
 import tqdm
 import datasets
 from transformers import AutoTokenizer
+import tensorflow as tf
 
 
 # to simplify: use only longest string of citation variants
@@ -13,6 +14,47 @@ def get_longest(citations):
         longest = max(citation_variants, key=len)
         longest_variants.append(longest)
     return longest_variants
+
+
+def _int64_feature(value):
+    """Returns an int64_list from a bool / enum / int / uint."""
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
+
+def _bytes_feature(value):
+    """Returns a bytes_list from a string / byte."""
+    if isinstance(value, type(tf.constant(0))):
+        value = value.numpy() # BytesList won't unpack a string from an EagerTensor.
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+
+def serialize_example(x, y):
+    """
+    Creates a tf.train.Example message ready to be written to a file.
+    """
+    # Create a dictionary mapping the feature name to the tf.train.Example-compatible
+    # data type.
+    feature = {
+        'x': _int64_feature(x),
+        'y': _int64_feature(y),
+    }
+
+    # Create a Features message using tf.train.Example.
+    example_proto = tf.train.Example(features=tf.train.Features(feature=feature))
+    return example_proto.SerializeToString()
+
+
+def to_tfrecords(dataset):
+    # Write the records to a file.
+    example_path = "tfrecords/example.tfrecord"
+    with tf.io.TFRecordWriter(example_path) as file_writer:
+        dataset = dataset.unbatch()
+        for sample in tqdm.tqdm(dataset):
+            import pdb
+            pdb.set_trace()
+            record_bytes = serialize_example(sample['text'], sample['label'])
+            file_writer.write(record_bytes)
+
 
 
 def preprocess_json_and_save_to_parquet(data_dir_name, args):
@@ -125,13 +167,12 @@ def create_tokenize_function(tokenizer, args):
     def tokenize_function(examples):
             inputs = [input for input in examples['text']]
             targets = [target for target in examples['label']]
-            model_inputs = tokenizer(inputs, max_length=256, truncation=True, padding="max_length")
+            model_inputs = tokenizer(inputs, max_length=args.input_tokens, truncation=True, padding="max_length")
 
             with tokenizer.as_target_tokenizer():
                 labels = tokenizer(targets, max_length=args.output_tokens, truncation=True, padding="max_length")
 
             model_inputs["labels"] = labels["input_ids"]
-            # TODO remove unused columns here?
             return model_inputs
     return tokenize_function
 
@@ -143,22 +184,32 @@ def load_dataset(args, split=True):
         length_str = str(args.miniature_dataset_size)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
     data_dir_name = args.data_dir[:-1] + "_len_" + length_str + "/"
-
-    # create parquet files from raw data if not already done
-    if not os.path.exists(data_dir_name) or args.rebuild_dataset:
-        preprocess_json_and_save_to_parquet(data_dir_name, args)
-    else:
-        print("parquet file already exists, loading parquet...")
-
-    df = parquet_to_dataset(data_dir_name, args)
-    if split:
-        df = df.train_test_split(test_size=0.1)
-    
+    tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"
     tokenizer = AutoTokenizer.from_pretrained(args.modelname)
 
-    tokenized_datasets = df.map(
-        create_tokenize_function(tokenizer, args=args),
-        batched=True
-    )
-    return tokenized_datasets, df, tokenizer
+
+    # if tokenized dataset exists load it
+    if os.path.exists(tokenized_data_dir_name):
+        print("loading tokenized dataset from", tokenized_data_dir_name)
+        tokenized_datasets = datasets.load_from_disk(tokenized_data_dir_name)
+        print("finished loading tokenized ds")
+
+    else:
+        # create parquet files from raw data if not already done
+        if not os.path.exists(data_dir_name) or args.rebuild_dataset:
+            preprocess_json_and_save_to_parquet(data_dir_name, args)
+        else:
+            print("parquet file already exists, loading parquet...")
+
+        df = parquet_to_dataset(data_dir_name, args)
+        if split:
+            df = df.train_test_split(test_size=0.1)
+        
+
+        tokenized_datasets = df.map(
+            create_tokenize_function(tokenizer, args=args),
+            batched=True
+        )
+        tokenized_datasets.save_to_disk(tokenized_data_dir_name)
+    return tokenized_datasets, tokenizer
     
