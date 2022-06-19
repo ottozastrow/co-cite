@@ -2,8 +2,8 @@ import numpy as np
 import os
 import tensorflow as tf
 from tensorflow.nn import ctc_beam_search_decoder
-import timeit
 import matplotlib.pyplot as plt
+import tqdm
 
 from datasets import load_metric
 import wandb
@@ -16,10 +16,12 @@ from transformers import (
     BeamSearchScorer
 )
 
+def normalize(x):
+    return x.lower().replace(" ", "").replace("(", "").replace(")", "")
+
 
 def split_citation_segments(inputs):
     books = ["U.S.C.A", "C.F.R."]
-    normalize = lambda x: x.lower().replace(" ", "")
     books_normed = [normalize(book) for book in books]
     # split string on comma and remove empty strings
     if len(inputs) == 0:  # if input is an ampty string
@@ -28,7 +30,7 @@ def split_citation_segments(inputs):
         splits = [str for str in inputs.split(",") if str != ""]
     # if any book normed appears in the citation
     if any([book in normalize(splits[0]) for book in books_normed]):
-        txt = [segment.strip().lower() for segment in splits]
+        txt = [normalize(segment) for segment in splits]
     else:
         txt = [inputs]
     return txt
@@ -54,6 +56,8 @@ def citation_segment_acc(predictions, labels):
         # for every el in y, check if x has el
         contained = [el in x for el in y]
         sample_acc = np.mean(contained)
+        # import pdb
+        # pdb.set_trace()
         accs.append(sample_acc)
     batch_acc = np.mean(accs)
     return batch_acc
@@ -76,24 +80,20 @@ def logits_to_topk(logits, k):
     return beams, log_probs
 
 class CustomMetrics():
-    def __init__(self, prefix, args):
+    def __init__(self, prefix, args, top_ks):
         self.prefix = prefix
         self.args = args
+        self.top_ks = top_ks
 
-    def fast_metrics(self, tupledict) -> dict:
+    def fast_metrics(self, beams, labels, several_beams=False) -> dict:
         """
         tupledict is a tuple of (dict(list()), list())
         its counterintuitive but I'll keep it since the huggingface
         library uses it as interface
         """
 
-        beams = tupledict[0]["sequences"]
-        # beams is a list of 2d tensors k x batch_size x seq_len
-        if not isinstance(beams, list):
+        if not several_beams:
             beams = [beams]
-        labels = tupledict[1]
-        # convert beam from int32 to int64
-        beams = [tf.cast(beam, tf.int64) for beam in beams]
                 
         ### accuracies
         # correctness of batchsize x beam_index
@@ -103,29 +103,29 @@ class CustomMetrics():
         top_ks = [k for k in top_ks if k <= max_k]
 
         match_at_k = np.zeros((len(beams), len(labels)))
+        matches = {}
         results = {}
+        # iterate through all beams
         for i in range(len(beams)):
-            batch_accs = []
             beam = beams[i]
             for j in range(len(labels)):  # iterate through batch
 
-                if len(beam[j]) != len(labels[j]):
-                    exact_match = False
-                else:
-                    matches = beam[j] == labels[j]
-                    exact_match = all(matches)
-
-                batch_accs.append(exact_match)
+                x = normalize(beam[j])
+                y = normalize(labels[j])
+                exact_match = x == y
                 match_at_k[i, j] = exact_match
-            if i == 0:
-                batch_acc = np.mean(batch_accs)
-                results[self.prefix + 'accuracy'] = batch_acc
 
         for k in top_ks:
-            topk_acc = np.mean(np.any(match_at_k[:k, :], axis=0))
+            matches_topk = np.any(match_at_k[:k, :], axis=0)
+            matches_topk = np.array(matches_topk).astype(int)
+
+            matches[k] = matches_topk
+            topk_acc = np.mean(matches_topk)
             results[self.prefix + "top{}_acc".format(k)] = topk_acc
 
-        return results, list(match_at_k[0])
+        top1matches = list(match_at_k[0])
+
+        return results, matches
 
 
 class SaveModelCallback(tf.keras.callbacks.Callback):
@@ -153,32 +153,18 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
             self.on_epoch_end(self.epochcounter, incrase_epoch=False)
 
 
-def plot_precision_recall(preds, scores, targets, buckets=40):
-    matches = preds == targets
-    # create thresholds
-    min, max = np.min(scores), np.max(scores)
-    thresholds = np.linspace(min, max, buckets)
+def rearrange_model_generate(predictions, args):
 
-    # for every threshold, compute the precision
-    precisions = []
-    for threshold in thresholds:
-        # compute the number of true positives
-        true_positives = np.sum(matches & (scores >= threshold))
-        # compute the number of false positives
-        false_positives = np.sum((preds != targets) & (scores >= threshold))
-        # compute the precision
-        precision = true_positives / (true_positives + false_positives)
-        # append the precision to the list of precisions
-        precisions.append(precision)
-
-    # plot curve
-    plt.plot(thresholds, precisions)
-    # yaxsis, xaxis, title
-    plt.xlabel('Threshold')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-
-    wandb.log({"precision_recall": plt})
+    # annoying reformatting because of transformers.model.generate output is flattened (batchsize x beams)
+    # TODO: check whether output makes sense
+    beams = [[] for i in range(args.topk)]
+    assert len(predictions) == args.topk * args.batchsize,\
+        "assuming this format as output from generate()" + str(len(predictions))
+    # assuming predictions is batchsize x beam_num x tokens
+    for i in range(args.batchsize):
+        for j in range(args.topk):
+            beams[j].append(predictions[i*args.topk + j])
+    return beams
 
 
 def batch_accuracy(predictions, labels):
@@ -191,67 +177,109 @@ def batch_accuracy(predictions, labels):
 
     return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
 
-def tokens_2_words(tokenizer, predictions, labels):
+def tokens_2_words(tokenizer, predictions, labels, batched=True):
     predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
+   
     ### sample outputs
-    return decoded_labels, decoded_predictions
+    return decoded_predictions, decoded_labels
 
-# def create_metrics_fn(prefix, tokenizer, model, args, fast_metrics_only=False):
-#     """Function that computes all metrics for the given dataset.
-#     Args:
-#         prefix: name prefix for the metrics (e.g. "test_")
-#         tokenizer: tokenizer to use for the metrics
-#     Returns:
-#         results: dictionary with all metrics
-#         logs to wandb
-#     """
 
-#     rouge_metric = load_metric("rouge")
-#     import timeit
-#     def metrics_fn(data, topk=1):
-#         # predictions, labels = data
-#         labels = data[1]
-#         predictions = data[0]["sequences"]
+def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
+    print("starting eval" + prefix)
+    metric_outputs = []
+    all_matches = {}
+    for k in top_ks:
+        all_matches[k] = []
+    all_scores = []
+    samples_table = []
+    for batch in tqdm.tqdm(dataset):
+        inputs = batch["input_ids"]
+        labels = batch["labels"]
+        modeloutdict = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
+                                    output_scores=True, return_dict_in_generate=True)
+        scores = modeloutdict["scores"]
+        predictions = modeloutdict["sequences"]
+
+        decoded_predictions, decoded_labels = tokens_2_words(tokenizer, predictions, labels, batched=True)
+
+        beams = rearrange_model_generate(decoded_predictions, args)
+        beams = rearrange_model_generate(decoded_predictions, args)
+
+        metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
+        metric_outputs.append(metric_output)
+
+        # scores = list(log_probs[:, -1].numpy())
+        # add matches dict to all matches
+        for k in list(matches.keys()):
+            all_matches[k].extend(matches[k])
+        scores = list(scores.numpy())
+        scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
+        all_scores += scores
+
+        metric_output[prefix + "segment_accuracy"] = citation_segment_acc(
+            decoded_predictions, decoded_labels)
         
-#         results = {}
-        
-#         if not fast_metrics_only:
-#             predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
-#             decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-#             decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
-#             ### sample outputs
-#             my_table = wandb.Table(columns=["prediction", "groundtruth"], 
-#             data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
-#             wandb.log({prefix + "demo": my_table})
-            
-#             ### Compute ROUGE
-#             # measure time with timeit
-#             # if topk == 1:
-#             #     result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
-#             #     start = timeit.default_timer()
-#             #     end = timeit.default_timer()
-#             #     print("rouge time: ", end - start)
-#             #     results =  {(prefix + key): value.mid.fmeasure * 100 for key, value in result.items()}
-#             #     wandb.log({prefix + "rouge": results})
-            
-
-#         ### accuracy
-#         # if topk != 1:
-#         #     accuracy_per_sample = []
-#         #     for i in range(topk):
-#         #         accuracy_per_sample.append(batch_accuracy(predictions[i], labels))
-            
-#         #     results[prefix + 'acc_top' + str(topk)] = np.mean(np.array(accuracy_per_sample))
-#         #     wandb.log({prefix + 'acc_top' + str(topk): results[prefix + 'acc_top' + str(topk)]})
-        
-#         # results[prefix + 'acc'] = batch_accuracy(predictions[0], labels)
+        metric_outputs.append(metric_output)
+        rows=[list(t) for t in zip(decoded_predictions, decoded_labels)]
+        samples_table += rows
     
-#         # wandb.log({prefix + "accuracy": results[prefix + 'acc']})
+    wandb_table = wandb.Table(columns=["prediction", "label"], data=samples_table)
+    wandb.log({prefix + "demo": wandb_table})
+
+    metric_output = mean_over_metrics_batches(metric_outputs)
+    all_scores = np.array(all_scores)
+    plot_precision_recall(all_matches, all_scores, prefix=prefix, top_ks=top_ks)
+
+    results = mean_over_metrics_batches(metric_outputs)
+
+    print({'eval_' + prefix: results})
+    wandb.log({'eval_' + prefix: results})
 
 
-#         return results
-#     return metrics_fn
+def plot_precision_recall(matches, scores, prefix, top_ks, buckets=40):
+    # find threshold such that scores is split into equal buckets
+    scores_sorted = np.sort(scores)
+    scores_sorted = scores_sorted[::-1]
+    # thresholds are periodically taken across sorted scores
+    thresholds = [scores_sorted[round(len(scores) / buckets) * i] for i in range(buckets)]
+
+    for k in top_ks:
+        # for every threshold, compute the precision
+        precisions = []
+        for threshold in thresholds:
+            # compute the number of true positives
+            true_positives = np.sum(matches[k] & (scores >= threshold))
+            # compute the number of false positives
+            false_positives = np.sum(np.logical_not(matches[k]) & (scores >= threshold))
+            # compute the precision
+            precision = true_positives / (true_positives + false_positives)
+            # append the precision to the list of precisions
+            precisions.append(precision)
+
+        # plot curve
+        # plt.legend(["top " + str(k)])
+        plt.plot([i/buckets for i in range(buckets)], precisions, label="top " + str(k))
+        # plot with legend
+        # yaxsis, xaxis, title
+    plt.xlabel('recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+
+    wandb.log({prefix + "_precision_recall": plt})
+
+
+def mean_over_metrics_batches(metric_outputs):
+    # iterate through keys and items in metric_outputs and compute mean
+    # create numpy array from list of dicts
+    keys_list = list(metric_outputs[0].keys())
+    np_metric_output = []
+    for batch in metric_outputs:
+        np_metric_output.append([batch[key] for key in keys_list])
+    np_metric_output = np.array(np_metric_output)
+    np_metric_output = np.mean(np_metric_output, axis=0)
+    # translate metric_outputs back to dict
+    metric_output = {key: val for key, val in zip(keys_list, np_metric_output)}
+    return metric_output
+

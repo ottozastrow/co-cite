@@ -9,7 +9,6 @@ from packaging.version import parse
 from tensorflow.keras.callbacks import Callback
 import matplotlib.pyplot as plt
 import wandb
-import timeit
 
 import train_helpers
 
@@ -95,7 +94,7 @@ class KerasMetricCallback(Callback):
             # Wrap a tf.data.Dataset around it
             eval_dataset = tf.data.Dataset.from_tensor_slices(eval_dataset).batch(batch_size, drop_remainder=False)
         self.eval_dataset = eval_dataset
-        self.log_interval = 5 if self.args.debug else (len_train_dataset * batch_size) // 10
+        self.log_interval = 5 if self.args.debug else (len_train_dataset * batch_size) // 20
         
 
         self.predict_with_generate = predict_with_generate
@@ -237,27 +236,24 @@ class KerasMetricCallback(Callback):
             # all_labels = self._postprocess_predictions_or_labels(label_list)
             # beam search start timeit
 
-            start = timeit.default_timer()
             labels = labels["labels"]
+            decoded_predictions, decoded_labels = train_helpers.tokens_2_words(
+                self.tokenizer, predictions["sequences"], labels)
+            
             if self.predict_with_generate:
-                metric_output, matches = self.metric_fn((predictions, labels))
+                metric_output, matches = self.metric_fn(decoded_predictions, decoded_labels)
                 assert self.args.topk != 1, "huggingface the predictions['scores'] has a different meaning when not using beam search"
                 scores = list(predictions["scores"].numpy())
             else:
                 logits = predictions['logits']
                 beams, log_probs = train_helpers.logits_to_topk(
                     logits, self.args.topk)
-                # stop timeit
-                stop = timeit.default_timer()
-                print("Beam search time: {}".format(stop - start))
-                metric_output, matches = self.metric_fn((predictions, labels))
+                metric_output, matches = self.metric_fn(decoded_predictions, decoded_labels)
                 scores = list(log_probs[:, -1].numpy())
 
             all_matches += matches
             all_scores += scores
 
-            decoded_labels, decoded_predictions = train_helpers.tokens_2_words(
-                self.tokenizer, predictions["sequences"], labels)   
             metric_output[self.prefix + "segment_accuracy"] = train_helpers.citation_segment_acc(
                 decoded_predictions, decoded_labels)
             
@@ -268,10 +264,10 @@ class KerasMetricCallback(Callback):
         wandb_table = wandb.Table(columns=["prediction", "label"], data=samples_table)
         wandb.log({self.prefix + "demo": wandb_table})
 
-        metric_output = mean_over_metrics_batches(metric_outputs)
+        metric_output = train_helpers.mean_over_metrics_batches(metric_outputs)
         all_matches = np.array(all_matches).astype(int)
         all_scores = np.array(all_scores)
-        plot_precision_recall(all_matches, all_scores, prefix=self.prefix)
+        train_helpers.plot_precision_recall(all_matches, all_scores, prefix=self.prefix)
 
         if not isinstance(metric_output, dict):
             raise TypeError(
@@ -286,51 +282,6 @@ class KerasMetricCallback(Callback):
 
     def on_train_batch_end(self, batch, logs=None):
         if self.step_num % self.log_interval == 0 and self.prefix != "train_":
-            print("log interval and step num", self.log_interval, self.step_num)
             self.on_epoch_end(0, logs=logs)
         self.step_num += 1
-
-
-def plot_precision_recall(matches, scores, prefix, buckets=40):
-    # matches = preds == targets
-    # create thresholds
-    min, max = np.min(scores), np.max(scores)
-    thresholds = np.linspace(min, max, buckets)
-
-    # for every threshold, compute the precision
-    precisions = []
-    for threshold in thresholds:
-        # compute the number of true positives
-        true_positives = np.sum(matches & (scores >= threshold))
-        # compute the number of false positives
-        false_positives = np.sum(np.logical_not(matches) & (scores >= threshold))
-        # compute the precision
-        precision = true_positives / (true_positives + false_positives)
-        # append the precision to the list of precisions
-        precisions.append(precision)
-
-    # plot curve
-    plt.plot(thresholds, precisions)
-    # yaxsis, xaxis, title
-    plt.xlabel('Threshold')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-
-    wandb.log({prefix + "_precision_recall": plt})
-
-
-def mean_over_metrics_batches(metric_outputs):
-    # iterate through keys and items in metric_outputs and compute mean
-    # create numpy array from list of dicts
-    keys_list = list(metric_outputs[0].keys())
-    np_metric_output = []
-    for batch in metric_outputs:
-        np_metric_output.append([batch[key] for key in keys_list])
-    np_metric_output = np.array(np_metric_output)
-    np_metric_output = np.mean(np_metric_output, axis=0)
-    # translate metric_outputs back to dict
-    metric_output = {key: val for key, val in zip(keys_list, np_metric_output)}
-    return metric_output
-
-
 

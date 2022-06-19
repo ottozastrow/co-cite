@@ -9,11 +9,12 @@ from wandb.keras import WandbCallback
 # from transformers.keras_callbacks import KerasMetricCallback
 from transformers import DataCollatorForSeq2Seq, TFAutoModelForSeq2SeqLM, AdamWeightDecay
 from transformers.keras_callbacks import PushToHubCallback
+import tqdm
 
 import cocitedata
 import train_helpers
 import keras_metric_callback
-from train_helpers import CustomMetrics, SaveModelCallback
+from train_helpers import CustomMetrics, SaveModelCallback, tokens_2_words
 
 import wandb
 
@@ -58,6 +59,7 @@ generation_test_dataset = (
     .select(list(range(num_demo_samples)))
     .to_tf_dataset(
         batch_size=args.batchsize,
+        drop_remainder=True,
         columns=["input_ids", "attention_mask", "labels"],
         shuffle=False,
         collate_fn=data_collator,
@@ -69,15 +71,21 @@ generation_train_dataset = (
     .select(list(range(num_demo_samples)))
     .to_tf_dataset(
         batch_size=args.batchsize,
+        drop_remainder=True,
         columns=["input_ids", "attention_mask", "labels"],
         shuffle=False,
         collate_fn=data_collator,
     )
 )
 
+top_ks = [1, 3, 5, 20]
+max_k = max(top_ks)
+max_k = min(max_k, args.topk) 
+top_ks = [k for k in top_ks if k <= max_k]
 
-metric_fn_test = CustomMetrics(prefix="test_", args=args).fast_metrics
-metric_fn_train = CustomMetrics(prefix="train_", args=args).fast_metrics
+
+metric_fn_test = CustomMetrics(prefix="test_", args=args, top_ks=top_ks).fast_metrics
+metric_fn_train = CustomMetrics(prefix="train_", args=args, top_ks=top_ks).fast_metrics
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
     tokenizer=tokenizer,
     metric_fn=metric_fn_test,
@@ -97,7 +105,6 @@ model.compile(optimizer=optimizer)
 
 wandb_callback = WandbCallback(save_model=not args.debug)
 
-
 callbacks = [
     wandb_callback,
     metric_test_callback, 
@@ -112,25 +119,31 @@ if True: # not args.debug:
 
 
 if not args.notraining:
-    model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs,callbacks=callbacks)
+    model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs, callbacks=callbacks)
 
 ### evaluate model
 if not args.noevaluation:
-    print("starting eval")
-    for batch in generation_test_dataset:
-        inputs = batch["input_ids"]
-        labels = batch["labels"]
-        predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
-                                    output_scores=True, return_dict_in_generate=True)
-        results = metric_fn_test((predictions, labels))
-        print({'eval_test': results})
-        wandb.log({'eval_test': results})
+    train_helpers.evaluate(model, generation_test_dataset, metric_fn_test, prefix="test_", args=args, top_ks=top_ks,
+                           tokenizer=tokenizer)
+    train_helpers.evaluate(model, generation_train_dataset, metric_fn_train, prefix="train_", args=args, top_ks=top_ks,
+                           tokenizer=tokenizer)
 
-    # for batch in generation_train_dataset:
+
+    # results_all = []
+    # for batch in tqdm.tqdm(generation_train_dataset):
     #     inputs = batch["input_ids"]
     #     labels = batch["labels"]
     #     predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
     #                                 output_scores=True, return_dict_in_generate=True)
-    #     results = metric_fn_test((predictions, labels))
-    #     print({'eval_train': results})
-    #     wandb.log({'eval_train': results})    
+    #     predictions = predictions["sequences"]
+
+    #     predictions, labels = tokens_2_words(tokenizer, predictions, labels, batched=True)
+    #     # beams = [predictions[i] for i in range(len(predictions)) if i % args.topk == 0]
+    #     beams = train_helpers.rearrange_model_generate(predictions, args)
+    #     results_batch, _ = metric_fn_train(beams, labels, several_beams=True)
+    #     results_all.append(results_batch)
+    # results = keras_metric_callback.mean_over_metrics_batches(results_all)
+    
+    # print({'eval_train': results})
+    # wandb.log({'eval_train': results})
+
