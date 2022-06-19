@@ -77,6 +77,7 @@ class KerasMetricCallback(Callback):
         predict_with_generate: Optional[bool] = False,
         prefix: Optional[str] = None,
         args: Optional[int] = 1,
+        len_train_dataset: int = 0,
     ):
         super().__init__()
         self.step_num = 0
@@ -94,8 +95,8 @@ class KerasMetricCallback(Callback):
             # Wrap a tf.data.Dataset around it
             eval_dataset = tf.data.Dataset.from_tensor_slices(eval_dataset).batch(batch_size, drop_remainder=False)
         self.eval_dataset = eval_dataset
-        num_eval_batches = len(eval_dataset)
-        self.log_interval = 5 if self.args.debug else (num_eval_batches * batch_size) // 10
+        self.log_interval = 5 if self.args.debug else (len_train_dataset * batch_size) // 10
+        
 
         self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
@@ -256,7 +257,7 @@ class KerasMetricCallback(Callback):
             all_scores += scores
 
             decoded_labels, decoded_predictions = train_helpers.tokens_2_words(
-                self.tokenizer, predictions["sequences"], labels)
+                self.tokenizer, predictions["sequences"], labels)   
             metric_output[self.prefix + "segment_accuracy"] = train_helpers.citation_segment_acc(
                 decoded_predictions, decoded_labels)
             

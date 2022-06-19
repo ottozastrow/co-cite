@@ -83,12 +83,14 @@ metric_test_callback = keras_metric_callback.KerasMetricCallback(
     metric_fn=metric_fn_test,
     eval_dataset=generation_test_dataset, prefix="test_",
     predict_with_generate=True, args=args, batch_size=args.batchsize,
+    len_train_dataset = len(tokenized_datasets["train"]["label"])
 )
 metric_train_callback = keras_metric_callback.KerasMetricCallback(
     tokenizer=tokenizer,
     metric_fn=metric_fn_train,
     eval_dataset=generation_train_dataset, prefix="train_",
     predict_with_generate=True, args=args, batch_size=args.batchsize,
+    len_train_dataset = len(tokenized_datasets["train"]["label"]),
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)  # TODO warning high lr
 model.compile(optimizer=optimizer)
@@ -131,4 +133,4 @@ if not args.noevaluation:
     #                                 output_scores=True, return_dict_in_generate=True)
     #     results = metric_fn_test((predictions, labels))
     #     print({'eval_train': results})
-    #     wandb.log({'eval_train': results})
+    #     wandb.log({'eval_train': results})    

@@ -199,59 +199,59 @@ def tokens_2_words(tokenizer, predictions, labels):
     ### sample outputs
     return decoded_labels, decoded_predictions
 
-def create_metrics_fn(prefix, tokenizer, model, args, fast_metrics_only=False):
-    """Function that computes all metrics for the given dataset.
-    Args:
-        prefix: name prefix for the metrics (e.g. "test_")
-        tokenizer: tokenizer to use for the metrics
-    Returns:
-        results: dictionary with all metrics
-        logs to wandb
-    """
+# def create_metrics_fn(prefix, tokenizer, model, args, fast_metrics_only=False):
+#     """Function that computes all metrics for the given dataset.
+#     Args:
+#         prefix: name prefix for the metrics (e.g. "test_")
+#         tokenizer: tokenizer to use for the metrics
+#     Returns:
+#         results: dictionary with all metrics
+#         logs to wandb
+#     """
 
-    rouge_metric = load_metric("rouge")
-    import timeit
-    def metrics_fn(data, topk=1):
-        # predictions, labels = data
-        labels = data[1]
-        predictions = data[0]["sequences"]
+#     rouge_metric = load_metric("rouge")
+#     import timeit
+#     def metrics_fn(data, topk=1):
+#         # predictions, labels = data
+#         labels = data[1]
+#         predictions = data[0]["sequences"]
         
-        results = {}
+#         results = {}
         
-        if not fast_metrics_only:
-            predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
-            decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-            decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+#         if not fast_metrics_only:
+#             predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
+#             decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
+#             decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
 
-            ### sample outputs
-            my_table = wandb.Table(columns=["prediction", "groundtruth"], 
-            data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
-            wandb.log({prefix + "demo": my_table})
+#             ### sample outputs
+#             my_table = wandb.Table(columns=["prediction", "groundtruth"], 
+#             data=[list(t) for t in zip(decoded_predictions, decoded_labels)])
+#             wandb.log({prefix + "demo": my_table})
             
-            ### Compute ROUGE
-            # measure time with timeit
-            # if topk == 1:
-            #     result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
-            #     start = timeit.default_timer()
-            #     end = timeit.default_timer()
-            #     print("rouge time: ", end - start)
-            #     results =  {(prefix + key): value.mid.fmeasure * 100 for key, value in result.items()}
-            #     wandb.log({prefix + "rouge": results})
+#             ### Compute ROUGE
+#             # measure time with timeit
+#             # if topk == 1:
+#             #     result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
+#             #     start = timeit.default_timer()
+#             #     end = timeit.default_timer()
+#             #     print("rouge time: ", end - start)
+#             #     results =  {(prefix + key): value.mid.fmeasure * 100 for key, value in result.items()}
+#             #     wandb.log({prefix + "rouge": results})
             
 
-        ### accuracy
-        # if topk != 1:
-        #     accuracy_per_sample = []
-        #     for i in range(topk):
-        #         accuracy_per_sample.append(batch_accuracy(predictions[i], labels))
+#         ### accuracy
+#         # if topk != 1:
+#         #     accuracy_per_sample = []
+#         #     for i in range(topk):
+#         #         accuracy_per_sample.append(batch_accuracy(predictions[i], labels))
             
-        #     results[prefix + 'acc_top' + str(topk)] = np.mean(np.array(accuracy_per_sample))
-        #     wandb.log({prefix + 'acc_top' + str(topk): results[prefix + 'acc_top' + str(topk)]})
+#         #     results[prefix + 'acc_top' + str(topk)] = np.mean(np.array(accuracy_per_sample))
+#         #     wandb.log({prefix + 'acc_top' + str(topk): results[prefix + 'acc_top' + str(topk)]})
         
-        # results[prefix + 'acc'] = batch_accuracy(predictions[0], labels)
+#         # results[prefix + 'acc'] = batch_accuracy(predictions[0], labels)
     
-        # wandb.log({prefix + "accuracy": results[prefix + 'acc']})
+#         # wandb.log({prefix + "accuracy": results[prefix + 'acc']})
 
 
-        return results
-    return metrics_fn
+#         return results
+#     return metrics_fn
