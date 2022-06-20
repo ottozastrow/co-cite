@@ -17,6 +17,11 @@ from transformers import (
 )
 
 def normalize(x):
+    # first remove year:
+    # "1vet.app.49(c), 55 (1990)"
+    # -> 1vet.app.49(c), 55 
+    if x[-1] == ")" and x[-2].isnumeric():
+        x = x.rsplit("(", 1)[0]
     return x.lower().replace(" ", "").replace("(", "").replace(")", "")
 
 
@@ -29,10 +34,10 @@ def split_citation_segments(inputs):
     else:
         splits = [str for str in inputs.split(",") if str != ""]
     # if any book normed appears in the citation
-    if any([book in normalize(splits[0]) for book in books_normed]):
-        txt = [normalize(segment) for segment in splits]
-    else:
-        txt = [inputs]
+    # if any([book in normalize(splits[0]) for book in books_normed]):
+    txt = [normalize(segment) for segment in splits]
+    # else:
+        # txt = [inputs]
     return txt
 
 
@@ -56,11 +61,9 @@ def citation_segment_acc(predictions, labels):
         # for every el in y, check if x has el
         contained = [el in x for el in y]
         sample_acc = np.mean(contained)
-        # import pdb
-        # pdb.set_trace()
         accs.append(sample_acc)
-    batch_acc = np.mean(accs)
-    return batch_acc
+    # batch_acc = np.mean(accs)  # TODO remove
+    return accs
 
 
 def logits_to_topk(logits, k):
@@ -208,7 +211,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         beams = rearrange_model_generate(decoded_predictions, args)
 
         metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
-        metric_outputs.append(metric_output)
 
         # scores = list(log_probs[:, -1].numpy())
         # add matches dict to all matches
@@ -217,15 +219,15 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         scores = list(scores.numpy())
         scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
         all_scores += scores
-
-        metric_output[prefix + "segment_accuracy"] = citation_segment_acc(
-            decoded_predictions, decoded_labels)
+        
+        segment_acc = citation_segment_acc(beams[0], decoded_labels)
+        metric_output[prefix + "segment_accuracy"] = np.mean(segment_acc)
         
         metric_outputs.append(metric_output)
-        rows=[list(t) for t in zip(decoded_predictions, decoded_labels)]
+        rows=[list(t) for t in zip(beams[0], decoded_labels, scores, segment_acc )]
         samples_table += rows
     
-    wandb_table = wandb.Table(columns=["prediction", "label"], data=samples_table)
+    wandb_table = wandb.Table(columns=["prediction", "label", "scores", "segment_acc"], data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
     metric_output = mean_over_metrics_batches(metric_outputs)

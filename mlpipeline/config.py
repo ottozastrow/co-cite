@@ -27,7 +27,7 @@ def cmd_arguments(debug=False):
     
     if args.debug or debug:
         args.miniature_dataset = True
-        args.miniature_dataset_size = 10
+        args.miniature_dataset_size = 2
         args.batchsize = 1
         # args.input_tokens=8
         # args.output_tokens=4

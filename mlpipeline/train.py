@@ -45,13 +45,12 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
     
 )
 
-# valid number between 100 and 1000
+# valid number between 100 and 5000
 ds_len = len(tokenized_datasets["test"]["label"])
 num_demo_samples = max(100, ds_len // 10)
 num_demo_samples = min(5000, num_demo_samples)
 if num_demo_samples > ds_len:
     num_demo_samples = ds_len
-
 
 generation_test_dataset = (
     tokenized_datasets["test"]
@@ -111,7 +110,7 @@ callbacks = [
     metric_train_callback,
 ]
 
-if True: # not args.debug:
+if not args.debug:
     modelsave_dir="./model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
     modelsave_dir += "debug/" if args.debug else ""
     save_model_callback = SaveModelCallback(modelsave_dir, model=model, tokenizer=tokenizer)
@@ -127,23 +126,3 @@ if not args.noevaluation:
                            tokenizer=tokenizer)
     train_helpers.evaluate(model, generation_train_dataset, metric_fn_train, prefix="train_", args=args, top_ks=top_ks,
                            tokenizer=tokenizer)
-
-
-    # results_all = []
-    # for batch in tqdm.tqdm(generation_train_dataset):
-    #     inputs = batch["input_ids"]
-    #     labels = batch["labels"]
-    #     predictions = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
-    #                                 output_scores=True, return_dict_in_generate=True)
-    #     predictions = predictions["sequences"]
-
-    #     predictions, labels = tokens_2_words(tokenizer, predictions, labels, batched=True)
-    #     # beams = [predictions[i] for i in range(len(predictions)) if i % args.topk == 0]
-    #     beams = train_helpers.rearrange_model_generate(predictions, args)
-    #     results_batch, _ = metric_fn_train(beams, labels, several_beams=True)
-    #     results_all.append(results_batch)
-    # results = keras_metric_callback.mean_over_metrics_batches(results_all)
-    
-    # print({'eval_train': results})
-    # wandb.log({'eval_train': results})
-
