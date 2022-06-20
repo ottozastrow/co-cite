@@ -39,7 +39,7 @@ tf_train_set = tokenized_datasets["train"].to_tf_dataset(
 
 tf_test_set = tokenized_datasets["test"].to_tf_dataset(
     columns=["attention_mask", "input_ids", "labels"],
-    shuffle=False,
+    shuffle=True,
     batch_size=args.batchsize,
     collate_fn=data_collator,
     
@@ -48,7 +48,7 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
 # valid number between 100 and 5000
 ds_len = len(tokenized_datasets["test"]["label"])
 num_demo_samples = max(100, ds_len // 10)
-num_demo_samples = min(5000, num_demo_samples)
+num_demo_samples = min(10000, num_demo_samples)
 if num_demo_samples > ds_len:
     num_demo_samples = ds_len
 

@@ -65,8 +65,8 @@ def preprocess_json_and_save_to_parquet(data_dir_name, args):
     we convert from one row per document to one row per citation."""
 
     filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
-    if args.miniature_dataset:
-        filepaths = filepaths[:args.miniature_dataset_size]
+    if args.samples != -1:
+        filepaths = filepaths[:args.samples]
 
     print("reading json files into df")
     # create batches of files
@@ -180,8 +180,8 @@ def create_tokenize_function(tokenizer, args):
 def load_dataset(args, split=True):    
     # determine name of dataset based on args
     length_str = "all" 
-    if args.miniature_dataset:
-        length_str = str(args.miniature_dataset_size)
+    if args.samples == -1:
+        length_str = str(args.samples)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
     data_dir_name = args.data_dir[:-1] + "_len_" + length_str + "/"
     tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"

@@ -1,5 +1,5 @@
-str = "1vet.app.49(c), 55 (1990)" # -> 1vet.app.49(c), 55 
+beams = [[j for i in range(2)] for j in range(3)]
+print(beams)
+beams = [list(i) for i in zip(*beams)]
 
-if str[-1] == ")" and str[-2].isnumeric():
-    print("yes")
-    print(str.rsplit("(", 1)[0])
+print(beams)

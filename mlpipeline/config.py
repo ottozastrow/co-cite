@@ -11,23 +11,20 @@ def cmd_arguments(debug=False):
     parser.add_argument("--input_tokens", type=int, help="input token length", default=256)
     parser.add_argument("--output_tokens", type=int, help="output token length", default=42)
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
-    parser.add_argument("--miniature_dataset", 
-                        help="for debugging only use 20 samples", action="store_true")
     parser.add_argument("--notraining", help="skip training pipeline", action="store_true")
     parser.add_argument("--noevaluation", help="skip post training evaluation pipeline", action="store_true")
     parser.add_argument("--rebuild_dataset", help="instead of attempting to load existing datasets rebuild it", action="store_true")
     parser.add_argument("--debug", 
                         help="make data and model tiny for fast local debugging", action="store_true")
-    parser.add_argument("--miniature_dataset_size", help="max number of documents to use for building dataset", 
-                        type=int, default=10)
+    parser.add_argument("--samples", help="max number of documents to use for building dataset. use -1 for all.", 
+                        type=int, default=-1)
     parser.add_argument("--data_dir", help="directory where data is stored",
                         default="../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
     args = parser.parse_args()
 
     
     if args.debug or debug:
-        args.miniature_dataset = True
-        args.miniature_dataset_size = 2
+        args.samples = 2
         args.batchsize = 1
         # args.input_tokens=8
         # args.output_tokens=4

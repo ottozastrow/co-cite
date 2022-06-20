@@ -237,7 +237,7 @@ class KerasMetricCallback(Callback):
             # beam search start timeit
 
             labels = labels["labels"]
-            decoded_predictions, decoded_labels = train_helpers.tokens_2_words(
+            decoded_predictions, decoded_labels, _ = train_helpers.tokens_2_words(
                 self.tokenizer, predictions["sequences"], labels)
             
             if self.predict_with_generate:

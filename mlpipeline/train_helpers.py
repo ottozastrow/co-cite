@@ -181,13 +181,15 @@ def batch_accuracy(predictions, labels):
 
     return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
 
-def tokens_2_words(tokenizer, predictions, labels, batched=True):
+def tokens_2_words(tokenizer, predictions, labels, inputs=None):
     predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-   
-    ### sample outputs
-    return decoded_predictions, decoded_labels
+    if inputs is not None:
+        decoded_inputs = tokenizer.batch_decode(inputs, skip_special_tokens=True)
+    else:
+        decoded_inputs = None
+    return decoded_predictions, decoded_labels, decoded_inputs
 
 
 def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
@@ -206,7 +208,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         scores = modeloutdict["scores"]
         predictions = modeloutdict["sequences"]
 
-        decoded_predictions, decoded_labels = tokens_2_words(tokenizer, predictions, labels, batched=True)
+        decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(tokenizer, predictions, labels, inputs=inputs)
 
         beams = rearrange_model_generate(decoded_predictions, args)
         beams = rearrange_model_generate(decoded_predictions, args)
@@ -223,12 +225,17 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         
         segment_acc = citation_segment_acc(beams[0], decoded_labels)
         metric_output[prefix + "segment_accuracy"] = np.mean(segment_acc)
+
+        # change dim ordering of list of lists
+        beams_reorderd = [list(i) for i in zip(*beams)]
         
         metric_outputs.append(metric_output)
-        rows=[list(t) for t in zip(beams[0], decoded_labels, scores, segment_acc )]
+        rows=[list(t) for t in zip(decoded_inputs, beams[0], decoded_labels, scores, segment_acc, beams_reorderd)]
         samples_table += rows
     
-    wandb_table = wandb.Table(columns=["prediction", "label", "scores", "segment_acc"], data=samples_table)
+        # import pdb
+        # pdb.set_trace()
+    wandb_table = wandb.Table(columns=["inputs", "top1 prediction", "label", "scores", "segment_acc", "all_topk_predictions"], data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
     metric_output = mean_over_metrics_batches(metric_outputs)
