@@ -20,8 +20,9 @@ def normalize(x):
     # first remove year:
     # "1vet.app.49(c), 55 (1990)"
     # -> 1vet.app.49(c), 55 
-    if x[-1] == ")" and x[-2].isnumeric():
-        x = x.rsplit("(", 1)[0]
+    if len(x) > 2:
+        if x[-1] == ")" and x[-2].isnumeric():
+            x = x.rsplit("(", 1)[0]
     return x.lower().replace(" ", "").replace("(", "").replace(")", "")
 
 
