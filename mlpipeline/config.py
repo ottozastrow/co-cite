@@ -30,4 +30,5 @@ def cmd_arguments(debug=False):
         # args.output_tokens=4
     
         # args.wandb_mode = "disabled"
+    args.contextlength = args.input_tokens * 3
     return args
