@@ -148,8 +148,6 @@ def preprocess_data(df, args):
     df['longest_citations'] = df['citation_vocab'].apply(get_longest)
 
     # read a fixed length context around each citation
-    # df = df.apply(get_citation_context, axis=1)
-    # pass argument to df.apply
     df = df.apply(get_citation_context, axis=1, args=(args,))
 
     # turn series of lists into series
@@ -189,7 +187,7 @@ def load_dataset(args):
 
 
     # if tokenized dataset exists load it
-    if os.path.exists(tokenized_data_dir_name):
+    if os.path.exists(tokenized_data_dir_name) and not args.rebuild_dataset:
         print("loading tokenized dataset from", tokenized_data_dir_name)
         tokenized_datasets = datasets.load_from_disk(tokenized_data_dir_name)
         print("finished loading tokenized ds")
@@ -203,7 +201,6 @@ def load_dataset(args):
 
         df = parquet_to_dataset(data_dir_name, args)
         df = df.train_test_split(test_size=0.1)
-        
 
         tokenized_datasets = df.map(
             create_tokenize_function(tokenizer, args=args),
