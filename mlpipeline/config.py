@@ -7,7 +7,6 @@ def cmd_arguments(debug=False):
     parser.add_argument("--wandb_mode", help="online, offline or disabled mode for wandb logging", default="online")
     parser.add_argument("--epochs", type=int, help="number of epochs", default=2)
     parser.add_argument("--batchsize", type=int, help="batch size", default=8)
-    parser.add_argument("--contextlength", type=int, help="context length", default=1200)
     parser.add_argument("--input_tokens", type=int, help="input token length", default=256)
     parser.add_argument("--output_tokens", type=int, help="output token length", default=42)
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
@@ -29,6 +28,6 @@ def cmd_arguments(debug=False):
         # args.input_tokens=8
         # args.output_tokens=4
     
-        # args.wandb_mode = "disabled"
-    args.contextlength = args.input_tokens * 3
+        args.wandb_mode = "disabled"
+    args.contextlength = args.input_tokens * 4
     return args
