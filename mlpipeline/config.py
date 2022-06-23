@@ -23,11 +23,11 @@ def cmd_arguments(debug=False):
 
     
     if args.debug or debug:
-        args.samples = 2
+        args.samples = 1
         args.batchsize = 1
-        # args.input_tokens=8
-        # args.output_tokens=4
-    
+        args.input_tokens=8
+        args.output_tokens=4
+        args.epochs=1
         args.wandb_mode = "disabled"
     args.contextlength = args.input_tokens * 4
     return args

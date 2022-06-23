@@ -233,8 +233,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         rows=[list(t) for t in zip(decoded_inputs, beams[0], decoded_labels, scores, segment_acc, beams_reorderd)]
         samples_table += rows
     
-        # import pdb
-        # pdb.set_trace()
     wandb_table = wandb.Table(columns=["inputs", "top1 prediction", "label", "scores", "segment_acc", "all_topk_predictions"], data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
@@ -246,6 +244,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     print({'eval_' + prefix: results})
     wandb.log({'eval_' + prefix: results})
+    return results
 
 
 def plot_precision_recall(matches, scores, prefix, top_ks, buckets=40):
@@ -280,16 +279,15 @@ def plot_precision_recall(matches, scores, prefix, top_ks, buckets=40):
     wandb.log({prefix + "_precision_recall": plt})
 
 
-def mean_over_metrics_batches(metric_outputs):
+def mean_over_metrics_batches(batchwise_metrics):
     # iterate through keys and items in metric_outputs and compute mean
     # create numpy array from list of dicts
-    keys_list = list(metric_outputs[0].keys())
-    np_metric_output = []
-    for batch in metric_outputs:
-        np_metric_output.append([batch[key] for key in keys_list])
-    np_metric_output = np.array(np_metric_output)
-    np_metric_output = np.mean(np_metric_output, axis=0)
-    # translate metric_outputs back to dict
-    metric_output = {key: val for key, val in zip(keys_list, np_metric_output)}
-    return metric_output
+    keys_list = list(batchwise_metrics[0].keys())
+    metric_outputs = {}
+    for key in keys_list:
+        values = []
+        for batch in batchwise_metrics:
+            values.append(batch[key])
+        metric_outputs[key] = np.mean(values)
+    return metric_outputs
 

@@ -2,15 +2,15 @@ import numpy as np
 from transformers import DataCollatorForSeq2Seq, TFAutoModelForSeq2SeqLM
 
 
-from keras_metric_callback import plot_precision_recall
-from train_helpers import CustomMetrics, citation_segment_acc
+from train_helpers import CustomMetrics, citation_segment_acc, mean_over_metrics_batches, plot_precision_recall
 from cocitedata import load_dataset
 
 from config import cmd_arguments
 args = cmd_arguments(debug=False)
 args.rebuild_dataset=False
 
-tokenized_datasets, ds, tokenizer = load_dataset(args)
+tokenized_datasets, tokenizer = load_dataset(args)
+# TODO get ds fom load ds
 ds = ds["train"]
 texts, labels = ds['text'], ds['label']
 model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname)
@@ -33,7 +33,7 @@ def test_plot_precision_recall():
     preds = np.random.randint(2, size=length)
     scores = np.random.uniform(-10, 1, length)
     targets = np.random.randint(2, size=length)
-    plot_precision_recall(preds, scores, targets)
+    plot_precision_recall(preds, scores, targets, top_ks=[1, 3, 5])
     assert True
 
 def test_segment_metric():
@@ -71,6 +71,9 @@ def test_acc_metric():
 
         break
 
-    
-test_segment_metric()
-test_acc_metric()
+def test_batch_means_nested():
+    inputs = [{"acc": 0.5, "loss": [0.5, 8]},
+            {"acc": 0.6, "loss": [0.6, 9]},]
+    res = train_helpers.mean_over_metrics_batches(inputs)
+    assert res["acc"] == 0.55
+    assert res["loss"] == 4.525

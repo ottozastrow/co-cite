@@ -177,7 +177,7 @@ def create_tokenize_function(tokenizer, args):
     return tokenize_function
 
 
-def load_dataset(args, split=True):    
+def load_dataset(args):    
     # determine name of dataset based on args
     length_str = "all" 
     if args.samples == -1:
@@ -202,8 +202,7 @@ def load_dataset(args, split=True):
             print("parquet file already exists, loading parquet...")
 
         df = parquet_to_dataset(data_dir_name, args)
-        if split:
-            df = df.train_test_split(test_size=0.1)
+        df = df.train_test_split(test_size=0.1)
         
 
         tokenized_datasets = df.map(
@@ -211,5 +210,6 @@ def load_dataset(args, split=True):
             batched=True
         )
         tokenized_datasets.save_to_disk(tokenized_data_dir_name)
+    
     return tokenized_datasets, tokenizer
     

@@ -9,7 +9,6 @@ from wandb.keras import WandbCallback
 # from transformers.keras_callbacks import KerasMetricCallback
 from transformers import DataCollatorForSeq2Seq, TFAutoModelForSeq2SeqLM, AdamWeightDecay
 from transformers.keras_callbacks import PushToHubCallback
-import tqdm
 
 import cocitedata
 import train_helpers
@@ -25,19 +24,21 @@ tokenized_datasets, tokenizer = cocitedata.load_dataset(args)
 # initialize model
 model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname)
 
-# tokenized_datasets = tokenized_datasets.remove_columns(dataset["train"].column_names)
-# tokenized_datasets = tokenized_datasets.remove_columns(dataset["test"].column_names)
-
 data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, return_tensors="tf")
+tokenized_train = tokenized_datasets["train"]
+tokenized_test = tokenized_datasets["test"]
+if args.debug:
+    tokenized_train = tokenized_train.select(list(range(2)))
+    tokenized_test = tokenized_test.select(list(range(2)))
 
-tf_train_set = tokenized_datasets["train"].to_tf_dataset(
+tf_train_set = tokenized_train.to_tf_dataset(
     columns=["attention_mask", "input_ids", "labels"],
     shuffle=True,
     batch_size=args.batchsize,
     collate_fn=data_collator,
 )
 
-tf_test_set = tokenized_datasets["test"].to_tf_dataset(
+tf_test_set = tokenized_test.to_tf_dataset(
     columns=["attention_mask", "input_ids", "labels"],
     shuffle=True,
     batch_size=args.batchsize,
@@ -46,14 +47,14 @@ tf_test_set = tokenized_datasets["test"].to_tf_dataset(
 )
 
 # valid number between 100 and 5000
-ds_len = len(tokenized_datasets["test"]["label"])
+ds_len = len(tokenized_test["label"])
 num_demo_samples = max(100, ds_len // 10)
 num_demo_samples = min(10000, num_demo_samples)
 if num_demo_samples > ds_len:
     num_demo_samples = ds_len
 
 generation_test_dataset = (
-    tokenized_datasets["test"]
+    tokenized_test
     .shuffle()
     .select(list(range(num_demo_samples)))
     .to_tf_dataset(
@@ -65,7 +66,7 @@ generation_test_dataset = (
     )
 )
 generation_train_dataset = (
-    tokenized_datasets["train"]
+    tokenized_train
     .shuffle()
     .select(list(range(num_demo_samples)))
     .to_tf_dataset(
@@ -86,18 +87,22 @@ top_ks = [k for k in top_ks if k <= max_k]
 metric_fn_test = CustomMetrics(prefix="test_", args=args, top_ks=top_ks).fast_metrics
 metric_fn_train = CustomMetrics(prefix="train_", args=args, top_ks=top_ks).fast_metrics
 metric_test_callback = keras_metric_callback.KerasMetricCallback(
+    model=model,
     tokenizer=tokenizer,
     metric_fn=metric_fn_test,
     eval_dataset=generation_test_dataset, prefix="test_",
     predict_with_generate=True, args=args, batch_size=args.batchsize,
-    len_train_dataset = len(tokenized_datasets["train"]["label"])
+    len_train_dataset = len(tokenized_train["label"]),
+    top_ks=top_ks,
 )
 metric_train_callback = keras_metric_callback.KerasMetricCallback(
+    model=model,
     tokenizer=tokenizer,
     metric_fn=metric_fn_train,
     eval_dataset=generation_train_dataset, prefix="train_",
     predict_with_generate=True, args=args, batch_size=args.batchsize,
-    len_train_dataset = len(tokenized_datasets["train"]["label"]),
+    len_train_dataset = len(tokenized_train["label"]),
+    top_ks=top_ks,
 )
 optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)  # TODO warning high lr
 model.compile(optimizer=optimizer)

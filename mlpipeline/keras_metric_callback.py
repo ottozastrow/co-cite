@@ -18,73 +18,32 @@ logger = logging.getLogger(__name__)
 
 class KerasMetricCallback(Callback):
     """
-    Callback to compute metrics at the end of every epoch. Unlike normal Keras metrics, these do not need to be
-    compilable by TF. It is particularly useful for common NLP metrics like BLEU and ROUGE that require string
-    operations or generation loops that cannot be compiled. Predictions (or generations) will be computed on the
-    `eval_dataset` before being passed to the `metric_fn` in `np.ndarray` format. The `metric_fn` should compute
-    metrics and return a dict mapping metric names to metric values.
-
-    We provide an example of a suitable metric_fn that computes ROUGE scores for a summarization model below. Note that
-    this example skips some post-processing for readability and simplicity, and should probably not be used as-is!
-
-    ```py
-    from datasets import load_metric
-
-    rouge_metric = load_metric("rouge")
-
-
-    def rouge_fn(predictions, labels):
-        decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
-        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-        result = rouge_metric.compute(predictions=decoded_predictions, references=decoded_labels)
-        return {key: value.mid.fmeasure * 100 for key, value in result.items()}
-    ```
-
-    The above function will return a dict containing values which will be logged like any other Keras metric:
-
-    ```
-    {'rouge1': 37.4199, 'rouge2': 13.9768, 'rougeL': 34.361, 'rougeLsum': 35.0781
-    ```
-
-    Args:
-        metric_fn (`Callable`):
-            Metric function provided by the user. It will be called with two arguments - `predictions` and `labels`.
-            These contain the model's outputs and matching labels from the dataset. It should return a dict mapping
-            metric names to numerical values.
-        eval_dataset (`tf.data.Dataset` or `dict` or `tuple` or `np.ndarray` or `tf.Tensor`):
-            Validation data to be used to generate predictions for the `metric_fn`.
-        output_cols (`List[str], *optional*):
-            A list of columns to be retained from the model output as the predictions. Defaults to all.
-        label_cols ('`List[str]`, *optional*'):
-            A list of columns to be retained from the input dataset as the labels. Will be autodetected if this is not
-            supplied.
-        batch_size (`int`, *optional*):
-            Batch size. Only used when the data is not a pre-batched `tf.data.Dataset`.
-        predict_with_generate (`bool`, *optional*, defaults to `False`):
-            Whether we should use `model.generate()` to get outputs for the model.
-
+    copied from transformers library
     """
-
     def __init__(
         self,
         metric_fn: Callable,
         eval_dataset: Union[tf.data.Dataset, np.ndarray, tf.Tensor, tuple, dict],
         tokenizer,
+        model,
+        args,
+        top_ks: List[int],
         output_cols: Optional[List[str]] = None,
         label_cols: Optional[List[str]] = None,
-        batch_size: Optional[int] = None,
+        batch_size: int = 1,
         predict_with_generate: Optional[bool] = False,
         prefix: Optional[str] = None,
-        args: Optional[int] = 1,
         len_train_dataset: int = 0,
     ):
         super().__init__()
         self.step_num = 0
         self.metric_fn = metric_fn
+        self.model = model
         self.tokenizer = tokenizer
         self.batch_size = batch_size
         self.prefix = prefix
         self.args = args
+        self.top_ks = top_ks
         if not isinstance(eval_dataset, tf.data.Dataset):
             if batch_size is None:
                 raise ValueError(
@@ -94,7 +53,10 @@ class KerasMetricCallback(Callback):
             # Wrap a tf.data.Dataset around it
             eval_dataset = tf.data.Dataset.from_tensor_slices(eval_dataset).batch(batch_size, drop_remainder=False)
         self.eval_dataset = eval_dataset
-        self.log_interval = 5 if self.args.debug else (len_train_dataset * batch_size) // 20
+        if args.debug:
+            self.log_interval = (len_train_dataset * batch_size) // 2 
+        else:
+            self.log_interval = (len_train_dataset * batch_size) // 20
         
 
         self.predict_with_generate = predict_with_generate
@@ -175,110 +137,8 @@ class KerasMetricCallback(Callback):
         return outputs
 
     def on_epoch_end(self, epoch, logs=None):
-        if hasattr(self.model, "config"):
-            ignore_keys = getattr(self.model.config, "keys_to_ignore_at_inference", [])
-        else:
-            ignore_keys = []
+        train_helpers.evaluate(self.model, self.eval_dataset, self.metric_fn, prefix=self.prefix, args=self.args, top_ks=self.top_ks, tokenizer=self.tokenizer)
 
-        main_input_name = None
-        if self.predict_with_generate:
-            # This dense conditional recognizes the case where we have an encoder-decoder model, but
-            # avoids getting tangled up when we just have a model with a layer called 'encoder'
-            if hasattr(self.model, "encoder") and hasattr(self.model.encoder, "main_input_name"):
-                if self.model.encoder.main_input_name != self.model.main_input_name:
-                    main_input_name = self.model.encoder.main_input_name
-            else:
-                main_input_name = getattr(self.model, "main_input_name", "input_ids")
-
-        metric_outputs = []
-        all_matches = []  # stores whether each prediction matches the label for each citation
-        all_scores = []
-        samples_table = []  # stores rows with detokenized generated samples and labels
-        # The whole predict/generate loop is handled inside this method
-        for batch in self.eval_dataset:
-            if isinstance(batch, tuple):
-                batch, labels = batch
-            else:
-                labels = None
-            if self.predict_with_generate:
-                if isinstance(batch, dict):
-                    generation_inputs = batch[main_input_name]
-                    attention_mask = batch.get("attention_mask", None)
-                else:
-                    generation_inputs = batch
-                    attention_mask = None
-
-                predictions = self.model.generate(generation_inputs, sample=True, num_beams=self.args.topk, num_return_sequence=self.args.topk, output_scores=True, return_dict_in_generate=True)
-            else:
-                predictions = self.model.predict(batch)
-                if isinstance(predictions, dict):
-                    # This converts any dict-subclass to a regular dict
-                    # Keras REALLY doesn't like it when we pass around a BatchEncoding or other derived class
-                    predictions = dict(predictions)
-                if self.output_cols is not None:
-                    predictions = {key: predictions[key] for key in self.output_cols}
-                else:
-                    predictions = {key: val for key, val in predictions.items() if key not in ignore_keys + ["loss"]}
-            # prediction_list.append(predictions)
-            if not self.use_keras_label:
-                labels = {key: batch[key].numpy() for key in self.label_cols}
-            elif isinstance(labels, dict):
-                labels = {key: array.numpy() for key, array in labels.items()}
-            elif isinstance(labels, list) or isinstance(labels, tuple):
-                labels = [array.numpy() for array in labels]
-            elif isinstance(labels, tf.Tensor):
-                labels = labels.numpy()
-            else:
-                raise TypeError(f"Confused by labels of type {type(labels)}")
-            
-
-            # all_preds = self._postprocess_predictions_or_labels(prediction_list)
-            # all_labels = self._postprocess_predictions_or_labels(label_list)
-            # beam search start timeit
-
-            labels = labels["labels"]
-            decoded_predictions, decoded_labels, _ = train_helpers.tokens_2_words(
-                self.tokenizer, predictions["sequences"], labels)
-            
-            if self.predict_with_generate:
-                metric_output, matches = self.metric_fn(decoded_predictions, decoded_labels)
-                assert self.args.topk != 1, "huggingface the predictions['scores'] has a different meaning when not using beam search"
-                scores = list(predictions["scores"].numpy())
-            else:
-                logits = predictions['logits']
-                beams, log_probs = train_helpers.logits_to_topk(
-                    logits, self.args.topk)
-                metric_output, matches = self.metric_fn(decoded_predictions, decoded_labels)
-                scores = list(log_probs[:, -1].numpy())
-
-            all_matches += matches
-            all_scores += scores
-
-            metric_output[self.prefix + "segment_accuracy"] = train_helpers.citation_segment_acc(
-                decoded_predictions, decoded_labels)
-            
-            metric_outputs.append(metric_output)
-            rows=[list(t) for t in zip(decoded_predictions, decoded_labels)]
-            samples_table += rows
-        
-        wandb_table = wandb.Table(columns=["prediction", "label"], data=samples_table)
-        wandb.log({self.prefix + "demo": wandb_table})
-
-        metric_output = train_helpers.mean_over_metrics_batches(metric_outputs)
-        all_matches = np.array(all_matches).astype(int)
-        all_scores = np.array(all_scores)
-        train_helpers.plot_precision_recall(all_matches, all_scores, prefix=self.prefix)
-
-        if not isinstance(metric_output, dict):
-            raise TypeError(
-                f"metric_fn should return a dict mapping metric names to values but instead returned {metric_output}"
-            )
-        # This is the critical bit - Keras passes a dict containing the loss and standard metric values for this epoch
-        # in the logs argument. Ordinarily, this is so the callback can read them, but in this case we write a bunch of
-        # new keys in there, which will then get read by the History callback and treated like any other metric value.
-        # I promise that I have it in writing from Chollet that this is okay.
-        wandb.log(metric_output)
-        logs.update(metric_output)
 
     def on_train_batch_end(self, batch, logs=None):
         if self.step_num % self.log_interval == 0 and self.prefix != "train_":
