@@ -36,7 +36,7 @@ class KerasMetricCallback(Callback):
         len_train_dataset: int = 0,
     ):
         super().__init__()
-        self.step_num = 0
+        self.step_num = 1
         self.metric_fn = metric_fn
         self.model = model
         self.tokenizer = tokenizer
@@ -57,7 +57,7 @@ class KerasMetricCallback(Callback):
             self.log_interval = (len_train_dataset * batch_size) // 2 
         else:
             self.log_interval = (len_train_dataset * batch_size) // 20
-        
+        print(self.log_interval)
 
         self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
