@@ -215,7 +215,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
         metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
 
-        # scores = list(log_probs[:, -1].numpy())
         # add matches dict to all matches
         for k in list(matches.keys()):
             all_matches[k].extend(matches[k])
