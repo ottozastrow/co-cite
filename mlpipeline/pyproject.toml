@@ -1,0 +1,12 @@
+[project]
+name = "cocite"
+version = "0.0.1"
+dependencies = [
+    'importlib-metadata; python_version<"3.8"',
+]
+[tool.setuptools.packages]
+[tool.setuptools.packages.find]
+where = ["src"]  # ["."] by default
+include = ["src/*"]  # ["*"] by default
+exclude = ["src/tests/"]  # empty by default
+namespaces = false  # true by default

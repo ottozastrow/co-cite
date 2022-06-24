@@ -18,7 +18,7 @@ def cmd_arguments(debug=False):
     parser.add_argument("--samples", help="max number of documents to use for building dataset. use -1 for all.", 
                         type=int, default=-1)
     parser.add_argument("--data_dir", help="directory where data is stored",
-                        default="../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
+                        default="../../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
     args = parser.parse_args()
 
     
