@@ -10,7 +10,7 @@
 **/mlruns/
 **/results/
 **/model_save/
-mlpipeline/huggingface_cache/
+**/huggingface_cache/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -1,7 +1,7 @@
 import argparse
 
 
-def cmd_arguments(debug=False):
+def cmd_arguments(debug=False, testargs=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--modelname", help="name on huggingface model hub", default="t5-small")
     parser.add_argument("--wandb_mode", help="online, offline or disabled mode for wandb logging", default="online")
@@ -11,6 +11,7 @@ def cmd_arguments(debug=False):
     parser.add_argument("--output_tokens", type=int, help="output token length", default=42)
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
     parser.add_argument("--notraining", help="skip training pipeline", action="store_true")
+    parser.add_argument("--retriever", type=str, help="retriever type from 'bm25'|'dpr'|'embedding'", default="bm25")
     parser.add_argument("--noevaluation", help="skip post training evaluation pipeline", action="store_true")
     parser.add_argument("--rebuild_dataset", help="instead of attempting to load existing datasets rebuild it", action="store_true")
     parser.add_argument("--debug", 
@@ -19,7 +20,11 @@ def cmd_arguments(debug=False):
                         type=int, default=-1)
     parser.add_argument("--data_dir", help="directory where data is stored",
                         default="../../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
-    args = parser.parse_args()
+    
+    if testargs is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(args=testargs)
 
     
     if args.debug or debug:
