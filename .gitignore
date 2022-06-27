@@ -2,7 +2,10 @@
 *.csv
 *.json
 *.txt
-*.zip
+**.zip
+**.gz
+**elasticsearch**
+**.gz.*
 
 #loggings
 *lsf.o**
@@ -11,6 +14,7 @@
 **/results/
 **/model_save/
 **/huggingface_cache/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

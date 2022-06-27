@@ -19,6 +19,26 @@ import random
 
 import wandb
 
+def manual_es_launch():
+    import os
+    from subprocess import Popen, PIPE, STDOUT
+
+    # check if files exist
+    if not os.path.exists("elasticsearch-7.9.2-linux-x86_64.tar.gz"):
+        import subprocess
+        subprocess.call(['wget', 'https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.9.2-linux-x86_64.tar.gz', '-q']) 
+        subprocess.call(['tar', '-xzf', 'elasticsearch-7.9.2-linux-x86_64.tar.gz'])
+        subprocess.call(['chown', '-R', 'daemon:daemon', 'elasticsearch-7.9.2'])
+
+
+    es_server = Popen(
+        ["elasticsearch-7.9.2/bin/elasticsearch"], stdout=PIPE, stderr=STDOUT, preexec_fn=lambda: os.setuid(1)  # as daemon
+    )
+    print("starting sleeping")
+    # wait until ES has started
+    subprocess.call(["sleep", "30"])
+    print("done sleeping")
+
 
 def reinsert_citations(data):
     """data contains text with @cit@ tags. Replace them with citations"""
@@ -50,7 +70,7 @@ def setup_preprocessor(args):
 
 
 def build_document_store(args, document_store, filepaths, preprocessor):
-    launch_es()
+
     if args.rebuild_dataset:
         document_store.delete_all_documents()
 
