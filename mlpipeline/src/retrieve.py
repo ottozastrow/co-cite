@@ -15,6 +15,9 @@ import numpy as np
 import pandas as pd
 import random
 
+import wandb
+
+
 
 def reinsert_citations(data):
     """data contains text with @cit@ tags. Replace them with citations"""
@@ -111,6 +114,7 @@ def docs_contain_citation(docs, citation):
 
 
 def print_metrics(mrr):
+    
     # count values that arent -1
     positives = [x for x in mrr if x != -1]
     print("Positives:", positives)
@@ -120,11 +124,21 @@ def print_metrics(mrr):
     print("Accuracy:", len(positives) / len(mrr))
 
     # average vaulue of positives
-    print("Average MRR:", np.mean(positives))
+    avg_mrr =  np.mean(positives)
+    print("Average MRR:", avg_mrr)
+
+    # log metrics in wandb
+    wandb.log({"MRR": avg_mrr})
+    wandb.log({"Accuracy": len(positives) / len(mrr)})
+    wandb.log({"Positives": len(positives)})
+    wandb.log({"Negatives": negatives})
+
 
 
 def main():
     args = config.cmd_arguments()
+    wandb.init(project="cocite", tags=["retrieve"], config=args, mode=args.wandb_mode)
+
     # document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
     document_store = InMemoryDocumentStore()
     all_filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
@@ -179,7 +193,7 @@ def main():
         question = questions[i]
         retrieved_docs = retriever.retrieve(query=question, top_k=50)
         mrr.append(docs_contain_citation(retrieved_docs, answers[i]))
-        if i%100 == 0:
+        if (i+1)%100 == 0:
             print_metrics(mrr)
         # ranked_docs = ranker.predict(query=question, documents=retrieved_docs)
         # gen_answers = generator.predict(query=question, documents=ranked_docs)
