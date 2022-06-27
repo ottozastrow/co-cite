@@ -2,7 +2,7 @@ from haystack.utils import clean_wiki_text, convert_files_to_docs, fetch_archive
 from haystack.nodes import FARMReader, TransformersReader, PreProcessor, DensePassageRetriever, RAGenerator, BM25Retriever, SentenceTransformersRanker
 
 from haystack.document_stores import FAISSDocumentStore
-from haystack.document_stores import ElasticsearchDocumentStore
+from haystack.document_stores import ElasticsearchDocumentStore, InMemoryDocumentStore
 from haystack.utils import launch_es
 
 import config
@@ -66,22 +66,6 @@ def build_document_store(args, document_store, filepaths):
     return document_store
 
 
-# def load_questions(args, test_filepaths):
-#     data_dir = cocitedata.dataset_filepath(args)
-#     # use glob to get all files in the directory
-#     filepaths = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith('.parquet')]
-#     if args.samples != -1:
-#         filepaths = filepaths[:args.samples]
-    
-#     questions = []
-#     answers = []
-#     for file in filepaths:
-#         df = pd.read_parquet(file)
-#         questions.extend(df["text"].to_list())
-#         answers.extend(df["label"].to_list())
-
-#     return questions, answers
-
 def load_questions(args, filepaths):
 
     """json data is the format provided by the BVA dataset.
@@ -114,8 +98,6 @@ def load_questions(args, filepaths):
     return questions, answers
 
 
-
-
 def docs_contain_citation(docs, citation):
     """Check if any of the documents contains the citation
     if so return the index of the document containing the citation
@@ -143,7 +125,8 @@ def print_metrics(mrr):
 
 def main():
     args = config.cmd_arguments()
-    document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
+    # document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
+    document_store = InMemoryDocumentStore()
     all_filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
     if args.samples != -1:
         all_filepaths = all_filepaths[:args.samples]
