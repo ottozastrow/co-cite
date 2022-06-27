@@ -314,7 +314,7 @@ def evaluate_manual(args, test_filepaths, retriever):
 def recall_at_k(reciprocal_ranks, k_list):
     recall_at_k = {}
     for k in k_list:
-        recall_at_k[k] = len([1 for r in reciprocal_ranks if r <= k]) / len(reciprocal_ranks)
+        recall_at_k[k] = len([1 for r in reciprocal_ranks if r <= k and r > -1]) / len(reciprocal_ranks)
     return recall_at_k
 
 
