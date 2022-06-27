@@ -1,4 +1,4 @@
-from retrieve import reinsert_citations
+from retrieve import reinsert_citations, recall_at_k
 
 
 def test_reinsert_citations():

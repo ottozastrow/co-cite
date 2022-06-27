@@ -147,7 +147,9 @@ def docs_contain_citation(docs, citation):
     return -1
 
 
-def print_metrics(mrr):
+def print_metrics(mrr, k_list):
+    recalls = recall_at_k(mrr, k_list)
+    print("Recall@k: ", recalls)
     
     # count values that arent -1
     positives = [x for x in mrr if x != -1]
@@ -298,15 +300,22 @@ def evaluate_manual(args, test_filepaths, retriever):
     random.seed(42)
     random.shuffle(both)
     questions, answers = zip(*both)
-
+    k_list = [1, 5, 20, 50, 100, 200, 500]
     mrr = []
     for i in tqdm.tqdm(range(len(questions))):
         question = questions[i]
-        retrieved_docs = retriever.retrieve(query=question, top_k=50)
+        retrieved_docs = retriever.retrieve(query=question, top_k=max(k_list))
         mrr.append(docs_contain_citation(retrieved_docs, answers[i]))
         if (i+1)%100 == 0:
-            print_metrics(mrr)
-    print_metrics(mrr)
+            print_metrics(mrr, k_list)
+    print_metrics(mrr, k_list)
+
+
+def recall_at_k(reciprocal_ranks, k_list):
+    recall_at_k = {}
+    for k in k_list:
+        recall_at_k[k] = len([1 for r in reciprocal_ranks if r <= k]) / len(reciprocal_ranks)
+    return recall_at_k
 
 
 def evaluate_haystack(args, test_filepaths, retriever, document_store,
