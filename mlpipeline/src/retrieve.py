@@ -1,9 +1,11 @@
 from haystack.utils import clean_wiki_text, convert_files_to_docs, fetch_archive_from_http, print_answers
-from haystack.nodes import FARMReader, TransformersReader, PreProcessor, DensePassageRetriever, RAGenerator, BM25Retriever, SentenceTransformersRanker
+from haystack.nodes import FARMReader, TransformersReader, PreProcessor, DensePassageRetriever, RAGenerator, BM25Retriever, EmbeddingRetriever, SentenceTransformersRanker
 
 from haystack.document_stores import FAISSDocumentStore
 from haystack.document_stores import ElasticsearchDocumentStore, InMemoryDocumentStore
 from haystack.utils import launch_es
+from haystack.pipelines import Pipeline
+from haystack.nodes import Docs2Answers
 
 import config
 import cocitedata
@@ -16,7 +18,6 @@ import pandas as pd
 import random
 
 import wandb
-
 
 
 def reinsert_citations(data):
@@ -36,19 +37,22 @@ def reinsert_citations(data):
     return res
 
 
-def build_document_store(args, document_store, filepaths):
-    launch_es()
-    if args.rebuild_dataset:
-        document_store.delete_all_documents()
-
+def setup_preprocessor(args):
     preprocessor = PreProcessor(
-        clean_empty_lines=True,
-        clean_whitespace=True,
+        clean_empty_lines=False,
+        clean_whitespace=False,
+        split_respect_sentence_boundary=False,
         clean_header_footer=False,
         split_by="word",
         split_length=100,
-        split_respect_sentence_boundary=True,
     )
+    return preprocessor
+
+
+def build_document_store(args, document_store, filepaths, preprocessor):
+    launch_es()
+    if args.rebuild_dataset:
+        document_store.delete_all_documents()
 
     filebatchsize=100
     batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
@@ -69,7 +73,7 @@ def build_document_store(args, document_store, filepaths):
     return document_store
 
 
-def load_questions(args, filepaths):
+def load_labels(args, filepaths):
 
     """json data is the format provided by the BVA dataset.
     This function converts it to parquet format.
@@ -84,21 +88,31 @@ def load_questions(args, filepaths):
     batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
     questions = []
     answers = []
+    contexts = []
     for i in tqdm.tqdm(range(len(batches))):
         df = None
         batch = batches[i]
         for file in batch:
-            data = pd.read_json(file, lines=True) # read data frame from json file
-            data = cocitedata.preprocess_data(data, args)  # expensive operation
+            all_data = pd.read_json(file, lines=True) # read data frame from json file
+            data = cocitedata.preprocess_data(all_data, args)  # expensive operation
             if df is None:
                 df = data
             else:
                 df = pd.concat([df, data], copy=False, ignore_index=True)
-            
+        
+            with open(file) as f:
+                data = json.load(f)
+                fulltext = reinsert_citations(data)
+                # for every row in df add the same context
+                for i in range(len(df)):
+                    contexts.append(fulltext)            
+
         questions.extend(df["text"].to_list())
         answers.extend(df["label"].to_list())
+        # import pdb
+        # pdb.set_trace()
 
-    return questions, answers
+    return questions, answers, contexts
 
 
 def docs_contain_citation(docs, citation):
@@ -134,13 +148,81 @@ def print_metrics(mrr):
     wandb.log({"Negatives": negatives})
 
 
+def generate_squad_json(questions, answers, contexts, filepath):
+    """
+    squad format:
+        FeaturesDict({
+        'answers': Sequence({
+            'answer_start': tf.int32,
+            'text': Text(shape=(), dtype=tf.string),
+        }),
+        'context': Text(shape=(), dtype=tf.string),
+        'id': tf.string,
+        'is_impossible': tf.bool,
+        'plausible_answers': Sequence({
+            'answer_start': tf.int32,
+            'text': Text(shape=(), dtype=tf.string),
+        }),
+        'question': Text(shape=(), dtype=tf.string),
+        'title': Text(shape=(), dtype=tf.string),
+    })
+
+    save jsonl where each line is a json dict
+    """
+    # if file exists delete it
+    if os.path.exists(filepath):
+        os.remove(filepath)
+    
+    # create file
+    # generate random int
+    random_int = random.randint(0, 100000)
+    all_dicts = {"data":[]}
+    for i in range(len(questions)):
+        question = questions[i]
+        answer = answers[i]
+        context = contexts[i]
+        docdict = {
+            "paragraphs":[{
+                "context": context, 
+                "id": str(i + random_int), 
+                "title": str(i),
+                "is_impossible": False,
+                "qas":[{
+                    "id": str(i),
+                    "question": question,
+                    "answers": [{
+                        "text": answer,
+                        "answer_start": context.find(answer)
+                    }], 
+                }]
+            }],
+        }
+        import pdb
+        all_dicts["data"].append(docdict)
+
+    with open(filepath, "w") as f:
+        f.write(json.dumps(all_dicts))
+
 
 def main():
     args = config.cmd_arguments()
     wandb.init(project="cocite", tags=["retrieve"], config=args, mode=args.wandb_mode)
+    doc_index = "document"
+    label_index = "labels"
+    use_es_store = True
 
-    # document_store = ElasticsearchDocumentStore(host="localhost", username="", password="", index="document")
-    document_store = InMemoryDocumentStore()
+    if use_es_store:
+        document_store = ElasticsearchDocumentStore(
+            host="localhost",
+            username="",
+            password="",
+            index=doc_index,
+            label_index=label_index,
+            similarity="dot_product",
+            embedding_dim=768
+        )
+    else:
+        document_store = InMemoryDocumentStore()
     all_filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
     if args.samples != -1:
         all_filepaths = all_filepaths[:args.samples]
@@ -150,8 +232,12 @@ def main():
 
     kb_filepaths = all_filepaths[:test_split_index]
     test_filepaths = all_filepaths[test_split_index:]
+    assert len(test_filepaths) > 0
+    preprocessor = setup_preprocessor(args)
     if args.rebuild_dataset:
-        document_store = build_document_store(args, document_store, kb_filepaths)
+        document_store = build_document_store(
+            args, document_store, kb_filepaths, preprocessor
+        )
 
     if args.retriever == "bm25":
         retriever = BM25Retriever(document_store)
@@ -161,8 +247,15 @@ def main():
             query_embedding_model="facebook/dpr-question_encoder-single-nq-base",
             passage_embedding_model="facebook/dpr-ctx_encoder-single-nq-base",
             use_gpu=True,
-            embed_title=True,
+            embed_title=False,
         )
+    elif args.retriever == "embedding":
+        retriever = EmbeddingRetriever(
+            document_store=document_store,
+            embedding_model="sentence-transformers/all-mpnet-base-v2",
+            model_format="sentence_transformers"
+        )
+
     else:
         raise ValueError("Unknown retriever")
 
@@ -171,36 +264,54 @@ def main():
         if args.retriever != "bm25":
             document_store.update_embeddings(retriever)
 
-    # Initialize RAG Generator
-    # generator = RAGenerator(
-    #     model_name_or_path="facebook/rag-token-nq",
-    #     use_gpu=True,
-    #     top_k=3,
-    #     max_length=200,
-    #     min_length=2,
-    #     # embed_title=True,
-    #     num_beams=3,
-    # )
-    questions, answers = load_questions(args, test_filepaths)
-    mrr = []
+    if True:
+        evaluate_manual(args, test_filepaths, retriever)
+    else:
+        evaluate_haystack(args, test_filepaths, retriever, document_store,
+            doc_index, label_index, preprocessor)
+
+
+def evaluate_manual(args, test_filepaths, retriever):
+    questions, answers, contexts = load_labels(args, test_filepaths)
     # shuffle the order of questions and answers
     both = list(zip(questions, answers))
     random.seed(42)
     random.shuffle(both)
     questions, answers = zip(*both)
 
+    mrr = []
     for i in tqdm.tqdm(range(len(questions))):
         question = questions[i]
         retrieved_docs = retriever.retrieve(query=question, top_k=50)
         mrr.append(docs_contain_citation(retrieved_docs, answers[i]))
         if (i+1)%100 == 0:
             print_metrics(mrr)
-        # ranked_docs = ranker.predict(query=question, documents=retrieved_docs)
-        # gen_answers = generator.predict(query=question, documents=ranked_docs)
-        # print(gen_answers)
-        # res = pipe.run(query=question, params={"Generator": {"top_k": 1}, "Retriever": {"top_k": 5}})
-        # print_answers(s, details="minimum")
     print_metrics(mrr)
+
+
+def evaluate_haystack(args, test_filepaths, retriever, document_store,
+    doc_index, label_index, preprocessor):
+    docs2answers = Docs2Answers()
+    pipe = Pipeline()
+    pipe.add_node(component=retriever, name="Retriever", inputs=["Query"])
+    pipe.add_node(component=docs2answers, name="Doc2Answers", inputs=["Retriever"])
+
+    questions, answers, contexts = load_labels(args, test_filepaths)
+    generate_squad_json(questions, answers, contexts, "evalset.json")
+
+    document_store.add_eval_data(
+        filename="evalset.json",
+        # filename="data/tutorial5/nq_dev_subset_v2.json",
+        doc_index=doc_index,
+        label_index=label_index,
+        preprocessor=preprocessor,
+        open_domain=False
+    )
+
+    # run evaluation
+    eval_labels = document_store.get_all_labels_aggregated()
+    eval_result = pipe.eval(labels=eval_labels, params={"Retriever": {"top_k": 5}})
+    print(eval_result)
 
 
 if __name__ == "__main__":

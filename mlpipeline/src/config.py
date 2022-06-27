@@ -26,7 +26,6 @@ def cmd_arguments(debug=False, testargs=None):
     else:
         args = parser.parse_args(args=testargs)
 
-    
     if args.debug or debug:
         args.samples = 1
         args.batchsize = 1
