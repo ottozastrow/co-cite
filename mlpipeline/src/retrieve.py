@@ -170,62 +170,6 @@ def print_metrics(mrr, k_list):
     wandb.log({"Negatives": negatives})
 
 
-def generate_squad_json(questions, answers, contexts, filepath):
-    """
-    squad format:
-        FeaturesDict({
-        'answers': Sequence({
-            'answer_start': tf.int32,
-            'text': Text(shape=(), dtype=tf.string),
-        }),
-        'context': Text(shape=(), dtype=tf.string),
-        'id': tf.string,
-        'is_impossible': tf.bool,
-        'plausible_answers': Sequence({
-            'answer_start': tf.int32,
-            'text': Text(shape=(), dtype=tf.string),
-        }),
-        'question': Text(shape=(), dtype=tf.string),
-        'title': Text(shape=(), dtype=tf.string),
-    })
-
-    save jsonl where each line is a json dict
-    """
-    # if file exists delete it
-    if os.path.exists(filepath):
-        os.remove(filepath)
-    
-    # create file
-    # generate random int
-    random_int = random.randint(0, 100000)
-    all_dicts = {"data":[]}
-    for i in range(len(questions)):
-        question = questions[i]
-        answer = answers[i]
-        context = contexts[i]
-        docdict = {
-            "paragraphs":[{
-                "context": context, 
-                "id": str(i + random_int), 
-                "title": str(i),
-                "is_impossible": False,
-                "qas":[{
-                    "id": str(i),
-                    "question": question,
-                    "answers": [{
-                        "text": answer,
-                        "answer_start": context.find(answer)
-                    }], 
-                }]
-            }],
-        }
-        import pdb
-        all_dicts["data"].append(docdict)
-
-    with open(filepath, "w") as f:
-        f.write(json.dumps(all_dicts))
-
-
 def main():
     args = config.cmd_arguments()
     wandb.init(project="cocite", tags=["retrieve"], config=args, mode=args.wandb_mode)

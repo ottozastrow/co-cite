@@ -33,7 +33,6 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
             self.on_epoch_end(self.epochcounter, incrase_epoch=False)
 
 
-
 def normalize(x):
     # first remove year:
     # "1vet.app.49(c), 55 (1990)"
