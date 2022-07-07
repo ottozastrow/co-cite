@@ -25,7 +25,7 @@ def main():
     tokenized_datasets, tokenizer = cocitedata.load_dataset(args)
 
     # initialize model
-    model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname)
+    model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=True)
 
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, return_tensors="tf")
     tokenized_train = tokenized_datasets["train"]
