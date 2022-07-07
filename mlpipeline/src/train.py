@@ -15,6 +15,12 @@ import keras_metric_callback
 from train_helpers import CustomMetrics, SaveModelCallback, tokens_2_words
 
 import wandb
+from codecarbon import EmissionsTracker
+
+
+
+
+
 
 
 def main():
@@ -127,7 +133,14 @@ def main():
 
 
     if not args.notraining:
+        if not args.debug:
+            tracker = EmissionsTracker()
+            tracker.start()
         model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs, callbacks=callbacks)
+        # GPU Intensive code goes here
+        if not args.debug:
+            co2_emissions = tracker.stop()
+            wandb.log({"CO2_emissions (in Kg)": co2_emissions})
 
     ### evaluate model
     if not args.noevaluation:
