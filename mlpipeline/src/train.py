@@ -19,13 +19,12 @@ from codecarbon import EmissionsTracker
 import re
 
 
-
 def main():
     args = cmd_arguments()
 
     wandb.init(project="cocite", config=args, mode=args.wandb_mode)
-
-    model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=True)
+    # TODO make from_pytorch dynamic. if tensorflow model or hub model set to false. else True.
+    model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=args.from_pytorch)
     tokenized_datasets, tokenizer = cocitedata.load_dataset(args, model_name_or_path=model.name_or_path)
 
     # initialize model
