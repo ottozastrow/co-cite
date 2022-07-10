@@ -16,10 +16,7 @@ from train_helpers import CustomMetrics, SaveModelCallback, tokens_2_words
 
 import wandb
 from codecarbon import EmissionsTracker
-
-
-
-
+import re
 
 
 
@@ -28,10 +25,10 @@ def main():
 
     wandb.init(project="cocite", config=args, mode=args.wandb_mode)
 
-    tokenized_datasets, tokenizer = cocitedata.load_dataset(args)
+    model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=True)
+    tokenized_datasets, tokenizer = cocitedata.load_dataset(args, model_name_or_path=model.name_or_path)
 
     # initialize model
-    model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=True)
 
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, return_tensors="tf")
     tokenized_train = tokenized_datasets["train"]
@@ -125,10 +122,21 @@ def main():
     ]
 
 
-    if not args.debug:
-        modelsave_dir="./model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
+    if True or not args.debug:
+        modelsave_dir="../model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
         modelsave_dir += "debug/" if args.debug else ""
-        save_model_callback = SaveModelCallback(modelsave_dir, model=model, tokenizer=tokenizer)
+        training_step = 0
+        if "model_save" in args.modelname:
+            # load local checkpoint instead of huggingface hub model
+            # set number of train steps if possible
+            if "_steps_" in args.modelname:
+                # find first int in string after substring "_steps_"
+                steps_text = args.modelname.split("_steps_")[-1]
+                training_step = int(re.search(r'\d+', steps_text).group())
+
+        save_model_callback = SaveModelCallback(
+            modelsave_dir, model=model,
+            tokenizer=tokenizer, training_step=training_step)
         callbacks.append(save_model_callback)
 
 

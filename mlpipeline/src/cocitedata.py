@@ -145,28 +145,31 @@ def generate_ds_if_not_cached(data_dir_name, args):
         print("parquet file already exists, loading parquet...")
 
 
-def dataset_filepath(args):
+def dataset_filepath(args, model_name_or_path):
     # determine name of dataset based on args
     length_str = "all" 
     if args.samples == -1:
         length_str = str(args.samples)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
-    data_dir_name = args.data_dir[:-1] + "_len_" + length_str + "/"
+    data_dir_name = args.data_dir[:-1] + "_modelname_" + model_name_or_path +\
+        "_data_len_" + length_str + "/"
     return data_dir_name
 
-def load_dataset(args):    
-    tokenizer = AutoTokenizer.from_pretrained(args.modelname)
-    data_dir_name = dataset_filepath(args)
+
+def load_dataset(args, model_name_or_path="unspecified"):
+    data_dir_name = dataset_filepath(args, model_name_or_path)
     tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"
 
+    tokenizer = AutoTokenizer.from_pretrained(args.modelname)
 
     # if tokenized dataset exists load it
     if os.path.exists(tokenized_data_dir_name) and not args.rebuild_dataset:
         print("loading tokenized dataset from", tokenized_data_dir_name)
         tokenized_datasets = datasets.load_from_disk(tokenized_data_dir_name)
-        print("finished loading tokenized ds")
+        print("finished loading precomputed tokenized ds")
 
     else:
+        print("rebuilding dataset at ", tokenized_data_dir_name)
         generate_ds_if_not_cached(data_dir_name, args)
         df = parquet_to_dataset(data_dir_name, args)
 
@@ -179,4 +182,3 @@ def load_dataset(args):
         tokenized_datasets.save_to_disk(tokenized_data_dir_name)
     
     return tokenized_datasets, tokenizer
-    

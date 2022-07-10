@@ -7,12 +7,14 @@
 **elasticsearch**
 **.gz.*
 
+
 #loggings
 *lsf.o**
 **/wandb/
 **/mlruns/
 **/results/
 **/model_save/
+
 **/huggingface_cache/
 
 # Byte-compiled / optimized / DLL files
