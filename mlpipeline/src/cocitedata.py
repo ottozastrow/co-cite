@@ -160,6 +160,10 @@ def load_dataset(args, model_name_or_path="unspecified"):
     data_dir_name = dataset_filepath(args, model_name_or_path)
     tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"
 
+    import wandb
+    wandb.config.update({"data_dir_name": data_dir_name})
+    wandb.config.update({"tokenized_data_dir_name": tokenized_data_dir_name})
+
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
 
     # if tokenized dataset exists load it
