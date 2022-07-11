@@ -160,7 +160,7 @@ def load_dataset(args, model_name_or_path="unspecified"):
     data_dir_name = dataset_filepath(args, model_name_or_path)
     tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"
 
-    tokenizer = AutoTokenizer.from_pretrained(args.modelname)
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
 
     # if tokenized dataset exists load it
     if os.path.exists(tokenized_data_dir_name) and not args.rebuild_dataset:
