@@ -6,15 +6,6 @@ import datasets
 from transformers import AutoTokenizer
 
 
-# to simplify: use only longest string of citation variants
-def get_longest(citations):
-    longest_variants = []
-    for citation_variants in citations:
-        longest = max(citation_variants, key=len)
-        longest_variants.append(longest)
-    return longest_variants
-
-
 def preprocess_json_and_save_to_parquet(data_dir_name, args):
     """json data is the format provided by the BVA dataset.
     This function converts it to parquet format.
@@ -108,8 +99,6 @@ def get_citation_context(x, args):
     return x
 
 def preprocess_data(df, args):
-    df['longest_citations'] = df['citation_vocab'].apply(get_longest)
-
     # read a fixed length context around each citation
     df = df.apply(get_citation_context, axis=1, args=(args,))
 
