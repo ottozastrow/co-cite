@@ -54,10 +54,10 @@ class KerasMetricCallback(Callback):
             eval_dataset = tf.data.Dataset.from_tensor_slices(eval_dataset).batch(batch_size, drop_remainder=False)
         self.eval_dataset = eval_dataset
         if args.debug:
-            self.log_interval = (len_train_dataset * batch_size) // 2 
+            self.log_interval = (len_train_dataset / batch_size) // 2 
         else:
-            self.log_interval = (len_train_dataset * batch_size) // 20
-        print(self.log_interval)
+            self.log_interval = (len_train_dataset / batch_size) // 5
+        print("log interval", self.log_interval, "train size", len_train_dataset, "batch size", batch_size)
 
         self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
