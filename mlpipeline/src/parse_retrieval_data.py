@@ -149,7 +149,7 @@ def search_string(
     skipping_p_list = []
     results = {}
     counter = 102 if is_numerical else "a"  # counts current paragraph
-    print("splits len", len(splits))
+    # print("splits len", len(splits))
     split_index = 0
     latest_found_pargraph = 0
     
@@ -241,17 +241,47 @@ def parse_uscode_v2(fulltext:str):
     return spans_paragraphs
 
 
-def statutory_kb_lookup(fulltext: str, statutory_kb:dict, citation:str):
+def statutory_kb_lookup(fulltext: str, statutory_kb:dict, citation:str) -> str:
     """ return text of statutelkb for citation """
-    span = statutory_kb[citation]
-    return fulltext[span["start"]:span["end"]]
+    if citation in statutory_kb.keys():
+        span = statutory_kb[citation]
+        text = fulltext[span["start"]:span["end"]]
+        # remove all html class tags
+        text = re.sub(r' class=".*?"', "", text)
+        return text
+    else:
+        return None
 
-filedir = "data/USCODE-2020-title38.htm"
-    
-fulltext = ""
-# read file into string
-with open(filedir, "r") as f:
-    fulltext = f.read()
-statutory_kb = parse_uscode_v2(fulltext)
-print(statutory_kb_lookup(fulltext, statutory_kb, "U.S.C.A. 38 §103"))
+
+# print(statutory_kb_lookup(fulltext, statutory_kb, "U.S.C.A. 38 §103"))
 # parse_uscode()
+
+
+def build_dataset():
+    filedir = "data/USCODE-2020-title38.htm"
+
+    paragraph_lengths = []
+    fulltext = ""
+    # read file into string
+    with open(filedir, "r") as f:
+        fulltext = f.read()
+
+    # remove all html comments
+    fulltext = re.sub(r"<!--.*?-->", "", fulltext)
+
+    # remove multiple empty lines
+    fulltext = re.sub(r"\n\n\n+", "\n\n", fulltext)
+    fulltext = re.sub(r"\n\n", "\n", fulltext)
+
+
+    print(fulltext[:600])
+    statutory_kb = parse_uscode_v2(fulltext)
+    prefix = "U.S.C.A. 38 §"
+    for i in range(103,1500):
+        res = statutory_kb_lookup(fulltext, statutory_kb, prefix + str(i))
+        if res:
+            print(i, len(res))
+            paragraph_lengths.append(len(res))
+            print(res)
+            break
+build_dataset()

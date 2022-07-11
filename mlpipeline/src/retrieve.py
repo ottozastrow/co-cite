@@ -173,10 +173,11 @@ def print_metrics(mrr, k_list):
 def main():
     args = config.cmd_arguments()
     wandb.init(project="cocite", tags=["retrieve"], config=args, mode=args.wandb_mode)
+
+    ######## setup document store #########
     doc_index = "document"
     label_index = "labels"
     use_es_store = True
-
     if use_es_store:
         document_store = ElasticsearchDocumentStore(
             host="localhost",
@@ -189,6 +190,9 @@ def main():
         )
     else:
         document_store = InMemoryDocumentStore()
+    
+    
+    ######## load datasets #########
     all_filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
     if args.samples != -1:
         all_filepaths = all_filepaths[:args.samples]
@@ -205,6 +209,7 @@ def main():
             args, document_store, kb_filepaths, preprocessor
         )
 
+    ######## setup retriever #########
     if args.retriever == "bm25":
         retriever = BM25Retriever(document_store)
     elif args.retriever == "dpr":
@@ -229,6 +234,28 @@ def main():
     if args.rebuild_dataset:
         if args.retriever != "bm25":
             document_store.update_embeddings(retriever)
+
+    if not args.notraining and args.retriever == "dpr":
+        # train DPR
+        train_filename = "data/retrieval/train.json"
+        test_filename = "data/retrieval/test.json"
+        doc_dir = "data/retrieval/"
+        save_dir = "../model_save/retrieval/" + args.retriever + "/"
+        retriever.train(
+            data_dir=doc_dir,
+            train_filename=train_filename,
+            dev_filename=test_filename,
+            test_filename=test_filename,
+            n_epochs=1,
+            batch_size=16,
+            grad_acc_steps=8,
+            save_dir=save_dir,
+            evaluate_every=3000,
+            embed_title=True,
+            num_positives=1,
+            num_hard_negatives=1,
+        )
+        reloaded_retriever = DensePassageRetriever.load(load_dir=save_dir, document_store=None)
 
     if True:
         evaluate_manual(args, test_filepaths, retriever)

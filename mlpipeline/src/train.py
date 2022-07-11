@@ -128,14 +128,14 @@ def main():
         if "model_save" in args.modelname:
             # load local checkpoint instead of huggingface hub model
             # set number of train steps if possible
-            if "_steps_" in args.modelname:
+            if "_step_" in args.modelname:
                 # find first int in string after substring "_steps_"
-                steps_text = args.modelname.split("_steps_")[-1]
+                steps_text = args.modelname.split("_step_")[-1]
                 training_step = int(re.search(r'\d+', steps_text).group())
 
         save_model_callback = SaveModelCallback(
             modelsave_dir, model=model,
-            tokenizer=tokenizer, training_step=training_step)
+            tokenizer=tokenizer, args=args, training_step=training_step)
         callbacks.append(save_model_callback)
 
 

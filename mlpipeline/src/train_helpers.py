@@ -9,13 +9,14 @@ import wandb
 
 
 class SaveModelCallback(tf.keras.callbacks.Callback):
-    def __init__(self, save_path, model, tokenizer, training_step=0):
+    def __init__(self, save_path, model, tokenizer, args, training_step=0):
         self.save_path = save_path
         self.model = model
         self.tokenizer = tokenizer
         self.counter = training_step  # when continuning training from a checkpoint set to non zero.
         self.log_interval=20000
         self.epochcounter = 0
+        self.args = args
 
     def on_epoch_end(self, epoch, logs=None):
         self.save_model(epoch)
@@ -30,7 +31,7 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
     def save_model(self, epoch):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
-        name = self.save_path + "epoch_" + str(epoch) + "_steps_" + str(self.counter)
+        name = self.save_path + "epoch_" + str(epoch) + "_step_" + str(self.counter * self.args.batchsize)
         self.model.save_pretrained(name)
         self.tokenizer.save_pretrained(name)
         print("Saved model and toknizer to {}".format(name))

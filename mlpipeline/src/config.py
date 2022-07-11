@@ -8,7 +8,7 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--epochs", type=int, help="number of epochs", default=2)
     parser.add_argument("--batchsize", type=int, help="batch size", default=8)
     parser.add_argument("--input_tokens", type=int, help="input token length", default=256)
-    parser.add_argument("--output_tokens", type=int, help="output token length", default=42)
+    parser.add_argument("--output_tokens", type=int, help="output token length", default=50)
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
     parser.add_argument("--notraining", help="skip training pipeline", action="store_true")
     parser.add_argument("--from_pytorch", help="load from pytorch model", action="store_true")
