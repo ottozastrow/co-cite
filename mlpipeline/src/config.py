@@ -21,12 +21,16 @@ def cmd_arguments(debug=False, testargs=None):
                         type=int, default=-1)
     parser.add_argument("--data_dir", help="directory where data is stored",
                         default="../../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
+    parser.add_argument("--tokenizer", help="by default is set to same as modelname.", default="")
     
     if testargs is None:
         args = parser.parse_args()
     else:
         args = parser.parse_args(args=testargs)
 
+    if args.tokenizer == "":
+        args.tokenizer = args.modelname
+    
     if args.debug or debug:
         args.samples = 1
         args.batchsize = 1
