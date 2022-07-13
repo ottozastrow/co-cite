@@ -25,18 +25,18 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--data_dir", help="directory where data is stored",
                         default="../../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
     
-    ### source dataset args
+    ### source dataset args (diffsearchindex)
     parser.add_argument("--add_source_data", help="set to add document sources per citation", action="store_true")
-    parser.add_argument("--diff_search_index_training", help="includes titles of source docs to labels", action="store_true")
+    parser.add_argument("--rebuild_source_kb", help="set to rebuild and cache kb for sources per citation", action="store_true")
+    parser.add_argument("--diffsearchindex_training", help="includes titles of source docs to labels", action="store_true")
+    parser.add_argument("--diffsearchindex_output_tokens", help="number of additional tokens after label", type=int, default=128)
     parser.add_argument("--source_data_path", type=str, 
                         default="../../data/sources_datasets/uscode/",
                         help="set to folder")
     parser.add_argument("--drop_citations_without_source",
                         help="when add_source_data is set, drop all samples where no source was found",
-                        action="store_true", default=True
-                        )
+                        action="store_true", default=True)
     
-
     if testargs is None:
         args = parser.parse_args()
     else:
@@ -44,6 +44,8 @@ def cmd_arguments(debug=False, testargs=None):
 
     if args.tokenizer == "":
         args.tokenizer = args.modelname
+    
+    args.diffsearchindex_output_tokens += args.output_tokens
     
     if args.debug or debug:
         args.samples = 3

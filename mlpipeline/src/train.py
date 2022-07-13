@@ -37,19 +37,19 @@ def main():
         tokenized_train = tokenized_train.select(list(range(2)))
         tokenized_test = tokenized_test.select(list(range(2)))
 
+    training_columns = ["attention_mask", "input_ids", "labels"]
     tf_train_set = tokenized_train.to_tf_dataset(
-        columns=["attention_mask", "input_ids", "labels"],
+        columns=training_columns,
         shuffle=True,
         batch_size=args.batchsize,
         collate_fn=data_collator,
     )
 
     tf_test_set = tokenized_test.to_tf_dataset(
-        columns=["attention_mask", "input_ids", "labels"],
+        columns=training_columns,
         shuffle=True,
         batch_size=args.batchsize,
         collate_fn=data_collator,
-        
     )
 
     # valid number between 100 and 5000
@@ -58,7 +58,7 @@ def main():
     num_demo_samples = min(10000, num_demo_samples)
     if num_demo_samples > ds_len:
         num_demo_samples = ds_len
-
+    
     generation_test_dataset = (
         tokenized_test
         .shuffle()
@@ -144,10 +144,14 @@ def main():
 
     ### evaluate model
     if not args.noevaluation:
-        train_helpers.evaluate(model, generation_test_dataset, metric_fn_test, prefix="test_", args=args, top_ks=top_ks,
-                            tokenizer=tokenizer)
-        train_helpers.evaluate(model, generation_train_dataset, metric_fn_train, prefix="train_", args=args, top_ks=top_ks,
-                            tokenizer=tokenizer)
+        train_helpers.evaluate(
+            model, generation_test_dataset,
+            metric_fn_test, prefix="test_", args=args,
+            top_ks=top_ks, tokenizer=tokenizer)
+        train_helpers.evaluate(
+            model, generation_train_dataset,
+            metric_fn_train, prefix="train_", args=args,
+            top_ks=top_ks, tokenizer=tokenizer)
 
 if __name__ == "__main__":
     main()

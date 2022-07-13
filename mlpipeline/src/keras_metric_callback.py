@@ -43,7 +43,8 @@ class KerasMetricCallback(Callback):
         self.batch_size = batch_size
         self.prefix = prefix
         self.args = args
-        self.top_ks = top_ks
+        self.top_ks = top_ks, 
+        self.label_cols = label_cols
         if not isinstance(eval_dataset, tf.data.Dataset):
             if batch_size is None:
                 raise ValueError(

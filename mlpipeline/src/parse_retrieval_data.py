@@ -101,7 +101,7 @@ def parse_uscode():
     last_index = 0
     missing_paragraphs = []
     last_found_p = 0
-    for p in tqdm.tqdm(range(1, 2000)):
+    for p in tqdm.tqdm(range(1, 10000)):
         
         # find the index of the first occurrence of § + str(p) + non-number
         # compute pi_start via regex pattern
@@ -186,7 +186,7 @@ def str_to_sections(
         else:
             if is_numerical:
                 assert type(counter) == int
-                if counter > 2000:  # type: ignore
+                if counter > 10000:  # type: ignore  # TODO: remove this hard limit
                     split_index += 1
                     counter = latest_found_pargraph
                 else:
@@ -309,7 +309,16 @@ def fuzzy_citation_search(search_str, sections, keys):
 
 
 def retrieve_usca(sample, sections: pd.DataFrame):
-    found_source = sample["label"] in sections.keys()
+    key = sample["label"]
+    
+    if key.endswith(","):
+        key = key[:-1]
+
+    # remove content of brackets from string with re
+    # key = re.sub(r'\(.*?\)', "", key)
+
+    found_source = key in sections.keys()
+    
     if found_source:
         retrieved_groundtruth = sections[sample["label"]]
         sample["title"] = retrieved_groundtruth["title"]
@@ -343,7 +352,7 @@ def load_sources_kb(args):
     assert args.source_data_path[-1] == "/"
     cached_dataset_json_path = args.source_data_path[:-1] + "_cached_dataset.json"
 
-    if args.rebuild_dataset or not os.path.exists(cached_dataset_json_path):
+    if args.rebuild_source_kb or not os.path.exists(cached_dataset_json_path):
         # delete cached_dataset_json_path
         if os.path.exists(cached_dataset_json_path):
             os.remove(cached_dataset_json_path)
@@ -376,6 +385,7 @@ def build_sources_kb(args, has_chapter_prefix=False):
         else:
             chapter_prefix = ""
         statutory_kb = parse_uscode_v2(fulltext, chapter_prefix)
+
         for p in statutory_kb.keys():
             span = statutory_kb[p]
             text = fulltext[span["start"]:span["end"]]

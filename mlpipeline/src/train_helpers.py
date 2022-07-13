@@ -144,6 +144,7 @@ class CustomMetrics():
         max_k = min(max_k, len(beams)) 
         top_ks = [k for k in top_ks if k <= max_k]
 
+
         match_at_k = np.zeros((len(beams), len(labels)))
         matches = {}
         results = {}
@@ -208,6 +209,9 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     print("starting eval" + prefix)
     metric_outputs = []
     all_matches = {}
+    # if top_ks isnatnce of tuple
+    if isinstance(top_ks, tuple):
+        top_ks = top_ks[0] # unexplainable bug causes this
     for k in top_ks:
         all_matches[k] = []
     all_scores = []
@@ -216,13 +220,16 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         inputs = batch["input_ids"]
         labels = batch["labels"]
         modeloutdict = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
-                                    output_scores=True, return_dict_in_generate=True)
+                                    output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
         scores = modeloutdict["scores"]
         predictions = modeloutdict["sequences"]
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(tokenizer, predictions, labels, inputs=inputs)
+        if args.diffsearchindex_training:
+            for i in range(len(predictions)):
+                predictions[i] = predictions[i].split("[SEP]")[0]
+    
 
-        beams = rearrange_model_generate(decoded_predictions, args)
         beams = rearrange_model_generate(decoded_predictions, args)
 
         metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)

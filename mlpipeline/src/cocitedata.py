@@ -14,11 +14,26 @@ def add_retrieval_data(data, retrieval_kb, args):
     data_list = [parse_retrieval_data.retrieve_usca(el, retrieval_kb) for el in data_list]
     # drop elements that aren't in the retrieval kb
     if args.drop_citations_without_source:
-        data_list = [el for el in data_list if not el["found_source"]]
+        data_list = [el for el in data_list if el["found_source"]]
+    if args.diffsearchindex_training:
+        data_list = [add_diffsearchindex_label(el, args) for el in data_list]
     
     # convert list of dictionaries to pandas dataframe
     data = pd.DataFrame(data_list)
     return data
+
+
+def add_diffsearchindex_label(sample, args):
+    if not sample["found_source"]:
+        sample["label_diffsearchindex"] = ""
+    else:
+        extract = "[SEP]" + sample["text"]
+        # extract = "[SEP]" + sample["title"] + "[SEP]" + sample["text"]
+        # *6 because I assume num tokens  * 6 > num characters
+        # the tokenizer will cut this off at the diffsearchindex_output_tokens
+        extract = extract[:args.diffsearchindex_output_tokens * 6]
+        sample["label_diffsearchindex"] = sample["label"] + extract
+    return sample
 
 
 def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
@@ -38,8 +53,8 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
     batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
 
     # iterate over batches. each batch is stored locally in its own parquet file.
-    dropped_sum = 0
-    total_samples = 0
+    dropped_sum = 0  # when adding source data, we drop citations that don't have a source
+    total_samples = 0  # for comparison with dropped_sum
     if args.add_source_data:
         knowledge_kb = parse_retrieval_data.load_sources_kb(args)
 
@@ -74,6 +89,7 @@ def parquet_to_dataframe(parquet_dir, args):
     df = pd.read_parquet(parquet_files, engine='pyarrow')
 
     return df
+
 
 def parquet_to_dataset(parquet_dir, args):
     parquet_files = [os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir) if f.endswith('.parquet')]
@@ -120,6 +136,7 @@ def get_citation_context(x, args):
     x['targets'] = targets
     return x
 
+
 def preprocess_data(df, args):
     # read a fixed length context around each citation
     df = df.apply(get_citation_context, axis=1, args=(args,))
@@ -142,8 +159,21 @@ def create_tokenize_function(tokenizer, args):
             model_inputs = tokenizer(inputs, max_length=args.input_tokens, truncation=True, padding="max_length")
 
             with tokenizer.as_target_tokenizer():
-                labels = tokenizer(targets, max_length=args.output_tokens, truncation=True, padding="max_length")
-
+                if args.diffsearchindex_training:
+                    labels = [target for target in examples['label_diffsearchindex']]
+                    labels = tokenizer(
+                        labels,
+                        max_length=args.diffsearchindex_output_tokens,
+                        truncation=True,
+                        padding="max_length"
+                    )
+                else:
+                    labels = tokenizer(
+                        targets,
+                        max_length=args.output_tokens,
+                        truncation=True,
+                        padding="max_length"
+                    )
             model_inputs["labels"] = labels["input_ids"]
             return model_inputs
     return tokenize_function
@@ -174,6 +204,12 @@ def generate_ds_if_not_cached(data_dir_name, args):
 
 def dataset_filepath(args, model_name_or_path:str, dataset_type="") -> str:
     # determine name of dataset based on args
+    dataset_type = ""
+    if args.add_source_data:
+        dataset_type += "haystack_DPR/"
+    if args.diffsearchindex_training:
+        dataset_type += "diffsearchindex_training/"
+    
     length_str = "all" 
     if args.samples == -1:
         length_str = str(args.samples)
@@ -186,19 +222,12 @@ def dataset_filepath(args, model_name_or_path:str, dataset_type="") -> str:
 
 
 def load_dataset(args, model_name_or_path="unspecified"):
-    dataset_type = ""
-    if args.add_source_data:
-        dataset_type += "haystack_DPR/"
-
-    data_dir_name = dataset_filepath(
-        args, model_name_or_path, 
-        dataset_type=dataset_type
-    )
+    data_dir_name = dataset_filepath(args, model_name_or_path)
     tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"
 
     import wandb
     wandb.config.update({
-        "data_dir_name": data_dir_name, "dataset_type": dataset_type,
+        "data_dir_name": data_dir_name,
         "tokenized_data_dir_name": tokenized_data_dir_name
     })
 
