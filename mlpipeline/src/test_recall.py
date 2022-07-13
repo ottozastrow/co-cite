@@ -37,17 +37,17 @@ def test_plot_precision_recall():
     assert True
 
 def test_segment_metric():
-
-    accs = citation_segment_acc(labels, labels)
+    args = None
+    accs = citation_segment_acc(labels, labels, args)
     assert accs == 1.0
-    accs = citation_segment_acc(["" for i in range(len(labels))], labels)
+    accs = citation_segment_acc(["" for i in range(len(labels))], labels, args)
     assert accs == 0.0, accs
 
     # accs = citation_segment_acc(["" for i in range(len(labels))], labels)
 
     x = ["38 C.F.R. 3.303,"]
     y = ["38 C.F.R. 3.303, 3.310"]
-    accs = citation_segment_acc(x, y)
+    accs = citation_segment_acc(x, y, args)
     assert accs == 0.5, accs
 
 

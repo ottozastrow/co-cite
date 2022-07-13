@@ -80,7 +80,7 @@ def split_citation_segments(inputs):
     return txt
 
 
-def citation_segment_acc(predictions, labels):
+def citation_segment_acc(predictions, labels, args):
     """
     converts from list of strings of this kind
     38 U.S.C.A. 5100, 5102, 5103, 5103A, 5106, 5107
@@ -93,6 +93,8 @@ def citation_segment_acc(predictions, labels):
     accs = []
     for i in range(len(labels)):
         x = predictions[i]
+        if args.diffsearchindex_training:
+            x = x.split("[SEP]")[0]
         y = labels[i]
         x = split_citation_segments(x)
         y = split_citation_segments(y)
@@ -136,7 +138,7 @@ class CustomMetrics():
 
         if not several_beams:
             beams = [beams]
-                
+             
         ### accuracies
         # correctness of batchsize x beam_index
         top_ks = [1, 3, 5, 20]
@@ -225,9 +227,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         predictions = modeloutdict["sequences"]
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(tokenizer, predictions, labels, inputs=inputs)
-        if args.diffsearchindex_training:
-            for i in range(len(decoded_predictions)):
-                decoded_predictions[i] = decoded_predictions[i].split("[SEP]")[0]
     
         beams = rearrange_model_generate(decoded_predictions, args)
 
@@ -240,7 +239,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
         all_scores += scores
         
-        segment_acc = citation_segment_acc(beams[0], decoded_labels)
+        segment_acc = citation_segment_acc(beams[0], decoded_labels, args)
         metric_output[prefix + "segment_accuracy"] = np.mean(segment_acc)
 
         # change dim ordering of list of lists
