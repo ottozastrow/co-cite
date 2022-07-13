@@ -21,23 +21,17 @@ def add_retrieval_data(data, retrieval_kb, args):
     return data
 
 
-def preprocess_json_and_save_to_parquet(data_dir_name, args, retrieval_kb=None):
+def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
     """json data is the format provided by the BVA dataset.
     This function converts it to parquet format.
     
     beforer converting to parquet the data is processed
     we transform from one row per document to one row per citation."""
 
+    print("reading json files into df")
     filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
     if args.samples != -1:
         filepaths = filepaths[:args.samples]
-
-    print("reading json files into df")
-    tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
-    # delete tmp dir if it exists
-    if os.path.exists(tmp_dir_name):
-        os.system("rm -r " + tmp_dir_name)
-    os.makedirs(tmp_dir_name)
 
     # create batches of files
     filebatchsize=100
@@ -47,7 +41,7 @@ def preprocess_json_and_save_to_parquet(data_dir_name, args, retrieval_kb=None):
     dropped_sum = 0
     total_samples = 0
     if args.add_source_data:
-        knowledge_kb = parse_retrieval_data.build_dataset(args)
+        knowledge_kb = parse_retrieval_data.load_sources_kb(args)
 
     for i in tqdm.tqdm(range(len(batches))):
         df_chunks = []
@@ -68,17 +62,9 @@ def preprocess_json_and_save_to_parquet(data_dir_name, args, retrieval_kb=None):
         print("finished converting batch nr. ", str(i), "to df")
         df = df.to_parquet(batch_fp, compression=None)
 
-    print("dropped", dropped_sum, "elements")
+    print("dropped", dropped_sum, "elements for not finding their source docs")
     print("total samples", total_samples)
 
-    # rename folder from tmp_dir_name to data_dir_name
-    # delete data_dir_name if it exists
-    if os.path.exists(data_dir_name):
-        os.system("rm -r " + data_dir_name)
-    
-    # only overwrite old dataset if creation of new one didn't crash until here.
-    os.rename(tmp_dir_name, data_dir_name)
-    print("saved df to parquet", data_dir_name)
 
 def parquet_to_dataframe(parquet_dir, args):
     parquet_files = [
@@ -165,7 +151,23 @@ def create_tokenize_function(tokenizer, args):
 def generate_ds_if_not_cached(data_dir_name, args):
     # create parquet files from raw data if not already done
     if not os.path.exists(data_dir_name) or args.rebuild_dataset:
-        preprocess_json_and_save_to_parquet(data_dir_name, args)
+        tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
+        # delete tmp dir if it exists
+        if os.path.exists(tmp_dir_name):
+            os.system("rm -r " + tmp_dir_name)
+        os.makedirs(tmp_dir_name)
+        
+        preprocess_json_and_save_to_parquet(args, tmp_dir_name)
+
+        # rename folder from tmp_dir_name to data_dir_name
+        # delete data_dir_name if it exists
+        if os.path.exists(data_dir_name):
+            os.system("rm -r " + data_dir_name)
+        
+        # only overwrite old dataset if creation of new one didn't crash until here.
+        os.rename(tmp_dir_name, data_dir_name)
+        print("saved df to parquet", data_dir_name)
+
     else:
         print("parquet file already exists, loading parquet...")
 

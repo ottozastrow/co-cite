@@ -336,12 +336,33 @@ def read_files(data_dir):
             fulltexts[i] = file.read()
     return fulltexts
 
-def build_dataset(args, has_chapter_prefix=False):
 
+def load_sources_kb(args):
+    """ if available load cache dataset, else rebuild dataset"""
+    # check if sourcedatapath ends with /
+    assert args.source_data_path[-1] == "/"
+    cached_dataset_json_path = args.source_data_path[:-1] + "_cached_dataset.json"
+
+    if args.rebuild_dataset or not os.path.exists(cached_dataset_json_path):
+        # delete cached_dataset_json_path
+        if os.path.exists(cached_dataset_json_path):
+            os.remove(cached_dataset_json_path)
+        
+        retrieval_kb = build_sources_kb(args)
+        with open(cached_dataset_json_path, "w") as f:
+            json.dump(retrieval_kb, f)
+        print("saved cache dataset to", cached_dataset_json_path)
+    
+    else:
+        with open(cached_dataset_json_path, "r") as file:
+            retrieval_kb = json.load(file)
+    return retrieval_kb
+
+
+def build_sources_kb(args, has_chapter_prefix=False):
+    print()
+    print("building retrieval dataset")
     fulltexts = read_files(args.source_data_path)
-
-    if args.debug:
-        fulltexts = fulltexts[:2]  # TODO: remove
 
     sections = {}
     paragraph_lengths =  []
@@ -370,6 +391,7 @@ def build_dataset(args, has_chapter_prefix=False):
         
     print(len(sections))
     print("mean paragraph length: ", np.mean(paragraph_lengths))
+    print()
     keys = "; ".join(list(sections.keys()))
 
     # res = fuzzy_citation_search("103", sections, keys)

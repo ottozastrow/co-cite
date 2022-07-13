@@ -27,6 +27,7 @@ def cmd_arguments(debug=False, testargs=None):
     
     ### source dataset args
     parser.add_argument("--add_source_data", help="set to add document sources per citation", action="store_true")
+    parser.add_argument("--diff_search_index_training", help="includes titles of source docs to labels", action="store_true")
     parser.add_argument("--source_data_path", type=str, 
                         default="../../data/sources_datasets/uscode/",
                         help="set to folder")
@@ -34,6 +35,7 @@ def cmd_arguments(debug=False, testargs=None):
                         help="when add_source_data is set, drop all samples where no source was found",
                         action="store_true", default=True
                         )
+    
 
     if testargs is None:
         args = parser.parse_args()
