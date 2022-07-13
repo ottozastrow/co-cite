@@ -4,6 +4,9 @@ import os
 from pkg_resources import working_set
 import tqdm
 import re
+import numpy as np
+from fuzzysearch import find_near_matches
+import pandas as pd
 
 
 def generate_squad_json(questions, answers, contexts, filepath):
@@ -135,37 +138,43 @@ def find_all(a_str, sub):
         start += len(sub) # use start += 1 to find overlapping matches
 
 
-def search_string(
+def str_to_sections(
         text:str, offset:int, citation_prefix:str, 
-        splittext:str, regex_prefix:str,
-        regex_postfix:str, is_numerical=False
+        citation_postfix:str,
+        regex_splittext:str, regex_prefix:str,
+        regex_postfix:str, is_numerical=False,
+        child_of=None,
+        chapter_prefix="",
     ):
+    python_splittext = regex_splittext.replace('\\',"")
     # find indices of splittext in text
-    split_offsets = list(find_all(text, splittext))
+    split_offsets = list(find_all(text, python_splittext))
 
     split_offsets = [0] + split_offsets + [len(text)]
-    splits = text.split(splittext)
-    splits = [splits[0]] + [splittext + split for split in splits[1:]]
+    splits = text.split(python_splittext)
+    splits = [splits[0]] + [regex_splittext + split for split in splits[1:]]
     skipping_p_list = []
     results = {}
     counter = 102 if is_numerical else "a"  # counts current paragraph
     # print("splits len", len(splits))
     split_index = 0
     latest_found_pargraph = 0
-    
+
     while True:
         if split_index >= len(splits):
             break
         split = splits[split_index]
         # print(split_index, counter, latest_found_pargraph)
         # find first occurence of regex_index in split
-        regex_pattern = re.compile(regex_prefix + str(counter) + regex_postfix)
+        search_string = regex_prefix + str(counter) + regex_postfix
+        regex_pattern = re.compile(search_string)
         span = regex_pattern.search(text, split_offsets[split_index], split_offsets[split_index+1])
         
         if span is not None:
             results[counter] = {
                 "start": span.start() + offset, 
                 "end": split_offsets[split_index+1] + offset,
+                "child_of": child_of,
             }
             split_index += 1
             if is_numerical:
@@ -174,9 +183,7 @@ def search_string(
                 counter = chr(ord(str(counter)) + 1)
             latest_found_pargraph = counter
 
-
         else:
-        
             if is_numerical:
                 assert type(counter) == int
                 if counter > 2000:  # type: ignore
@@ -186,7 +193,7 @@ def search_string(
                     skipping_p_list.append(counter)
                     counter = counter + 1  # type: ignore
             else:
-                if ord(str(counter)) > 25:
+                if counter == "z":
                     counter = latest_found_pargraph
                     split_index += 1
                     counter = "a"
@@ -195,48 +202,48 @@ def search_string(
                     # next character in alphabet
                     latest_found_pargraph = counter
                     counter = chr(ord(str(counter)) + 1)
-    # print("skipped: ", skipping_p_list)
     
     # change dictionary keys to citation string
     citations = {}
     for p in results.keys():
-        citations[citation_prefix + str(p)] = results[p]
+        citations[citation_prefix + chapter_prefix + str(p) + citation_postfix] = results[p]
+
     return citations
 
-def parse_uscode_v2(fulltext:str):
+def parse_uscode_v2(fulltext:str, chapter_prefix:str):
     """ return dictionary with paragraphs as index and text as value """
-
-    spans_paragraphs = search_string(
+    
+    spans_paragraphs = str_to_sections(
         fulltext,
         offset=0,
-        citation_prefix="U.S.C.A. 38 §",
-        splittext='<h3 class="section-head">§',
+        citation_prefix="38 U.S.C.A. § ",
+        chapter_prefix=chapter_prefix,
+        citation_postfix="",
+        regex_splittext='<h3 class="section-head">§',
         regex_prefix='<h3 class="section-head">§',
         regex_postfix=r".",
-        is_numerical=True
+        is_numerical=True,
+        child_of=None,
     )
     spans_sections = {}
     for p in spans_paragraphs.keys():
         span = spans_paragraphs[p]
         
-        # spans_sections.update(search_string(
-        #     fulltext[span["start"]: span["end"]],
-        #     offset=span["start"],
-        #     citation_prefix=" (" + str(p) + ")",
-        #     splittext=r'<p class="statutory-body">(',
-        #     regex_prefix=r'<p class="statutory-body">(',
-        #     regex_postfix=r")",
-        #     is_numerical=False
-        # ))
-        # print("lens", len(spans_sections))
+        spans_sections.update(str_to_sections(
+            fulltext[span["start"]: span["end"]],
+            offset=span["start"],
+            citation_prefix=p + "(",
+            citation_postfix = ")",
+            regex_splittext=r'<p class="statutory-body">\(',
+            regex_prefix=r'<p class="statutory-body">\(',
+            regex_postfix=r"\)",
+            is_numerical=False,
+            child_of=str(p),
+        ))
+    print("number of paragraphs: ", len(spans_paragraphs))
+    print("number of subsections", len(spans_sections))
     
-    print("num of paragraphs: ", len(spans_paragraphs))
-
-    for current in spans_paragraphs.keys():
-        span = spans_paragraphs[current]
-        break
-        print(fulltext[span["start"]:span["end"]])
-    print(spans_paragraphs.keys())
+    spans_paragraphs.update(spans_sections)
     # print(len(spans_sections))
     return spans_paragraphs
 
@@ -246,42 +253,125 @@ def statutory_kb_lookup(fulltext: str, statutory_kb:dict, citation:str) -> str:
     if citation in statutory_kb.keys():
         span = statutory_kb[citation]
         text = fulltext[span["start"]:span["end"]]
-        # remove all html class tags
-        text = re.sub(r' class=".*?"', "", text)
+        
         return text
     else:
         return None
 
 
-# print(statutory_kb_lookup(fulltext, statutory_kb, "U.S.C.A. 38 §103"))
-# parse_uscode()
+def normalize_section(text:str) -> dict:
+    string_editorial_notes = '<h4 class="note-head"><strong>Editorial Notes</strong></h4>'
+    string_source_credit = '<p class="source-credit">'
+    string_amendments = '<h4 class="note-head">Amendments</h4>'
+    text = text.split(string_editorial_notes)[0]
+    text = text.split(string_source_credit)[0]
+    text = text.split(string_amendments)[0]
+    text = re.sub(r' class=".*?"', "", text)
+    return text
 
-
-def build_dataset():
-    filedir = "data/USCODE-2020-title38.htm"
-
-    paragraph_lengths = []
-    fulltext = ""
-    # read file into string
-    with open(filedir, "r") as f:
-        fulltext = f.read()
-
+def normalize_document(fulltext):
     # remove all html comments
     fulltext = re.sub(r"<!--.*?-->", "", fulltext)
 
     # remove multiple empty lines
     fulltext = re.sub(r"\n\n\n+", "\n\n", fulltext)
     fulltext = re.sub(r"\n\n", "\n", fulltext)
+    return fulltext
+
+def parse_title(text:str, child_of, statutory_kb) -> str:
+    if child_of is not None:
+        try:
+            return statutory_kb[child_of]["title"]
+        except:
+            return "<no title parsed wtg>"
+    else:
+        # use regex to find string between '<h3> and </h3>'
+        try:
+            title = re.search(r'<h3 class="section-head">(.*?)</h3>', text).group(1)
+        except:
+            print("problem with title")
+            title ="<no title parsed>"
+            # remove all html class tags
+        return title
+
+def fuzzy_citation_search(search_str, sections, keys):
+    keys = " "*20 + keys + " "*10
+    results = find_near_matches(search_str, keys, max_l_dist=0)
+    citations = [keys[k.start-20:k.end+4] for k in results]
+    citations = [s.split(";")[1].strip() for s in citations]
+
+    # get title
+    titles = [sections[s]["title"] for s in citations]
+
+    # zip titles and citations
+    results = list(zip(citations, titles))
+    return results
 
 
-    print(fulltext[:600])
-    statutory_kb = parse_uscode_v2(fulltext)
-    prefix = "U.S.C.A. 38 §"
-    for i in range(103,1500):
-        res = statutory_kb_lookup(fulltext, statutory_kb, prefix + str(i))
-        if res:
-            print(i, len(res))
-            paragraph_lengths.append(len(res))
-            print(res)
-            break
-build_dataset()
+def retrieve_usca(sample, sections: pd.DataFrame):
+    found_source = sample["label"] in sections.keys()
+    if found_source:
+        retrieved_groundtruth = sections[sample["label"]]
+        sample["title"] = retrieved_groundtruth["title"]
+        sample["text"] = retrieved_groundtruth["text"]
+
+    else:
+        # no groundtruth found for", sample["label"]
+        sample["title"] = ""
+        sample["text"] = ""
+
+    sample["found_source"] = found_source
+    return sample
+
+
+def read_files(data_dir):
+    files = os.listdir(data_dir)
+    files = [f for f in files if f.endswith(".htm")]
+    files = sorted(files)
+    print("joining", files)
+    fulltexts = ["" for i in range(len(files))]
+    for i in range(len(files)):
+        f = files[i]
+        with open(data_dir + f, "r") as file:
+            fulltexts[i] = file.read()
+    return fulltexts
+
+def build_dataset(args, has_chapter_prefix=False):
+
+    fulltexts = read_files(args.source_data_path)
+
+    if args.debug:
+        fulltexts = fulltexts[:2]  # TODO: remove
+
+    sections = {}
+    paragraph_lengths =  []
+    for i in tqdm.tqdm(range(len(fulltexts))):
+        fulltext = normalize_document(fulltexts[i])
+        prefix = "38 U.S.C.A. § "
+        if has_chapter_prefix:
+            assert False, "not supported yet"
+            chapter_prefix = str(i) + "."
+            prefix += str(i+1) + "."
+        else:
+            chapter_prefix = ""
+        statutory_kb = parse_uscode_v2(fulltext, chapter_prefix)
+        for p in statutory_kb.keys():
+            span = statutory_kb[p]
+            text = fulltext[span["start"]:span["end"]]
+            normalized = normalize_section(text)
+            sections[p] = {
+                "text": normalized,
+                "citation": prefix + str(p),
+                "child_of": statutory_kb[p]["child_of"],
+                "title": parse_title(text, statutory_kb[p]["child_of"], sections)
+            }
+            
+            paragraph_lengths.append(len(sections[p]["text"]))
+        
+    print(len(sections))
+    print("mean paragraph length: ", np.mean(paragraph_lengths))
+    keys = "; ".join(list(sections.keys()))
+
+    # res = fuzzy_citation_search("103", sections, keys)
+    return sections
+

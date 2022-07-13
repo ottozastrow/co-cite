@@ -5,50 +5,86 @@ import tqdm
 import datasets
 from transformers import AutoTokenizer
 
+import parse_retrieval_data
 
-def preprocess_json_and_save_to_parquet(data_dir_name, args):
+
+def add_retrieval_data(data, retrieval_kb, args):
+    # convert pandas dataframe data to list of dictionaries
+    data_list = data.to_dict('records')
+    data_list = [parse_retrieval_data.retrieve_usca(el, retrieval_kb) for el in data_list]
+    # drop elements that aren't in the retrieval kb
+    if args.drop_citations_without_source:
+        data_list = [el for el in data_list if not el["found_source"]]
+    
+    # convert list of dictionaries to pandas dataframe
+    data = pd.DataFrame(data_list)
+    return data
+
+
+def preprocess_json_and_save_to_parquet(data_dir_name, args, retrieval_kb=None):
     """json data is the format provided by the BVA dataset.
     This function converts it to parquet format.
     
     beforer converting to parquet the data is processed
-    we convert from one row per document to one row per citation."""
+    we transform from one row per document to one row per citation."""
 
     filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
     if args.samples != -1:
         filepaths = filepaths[:args.samples]
 
     print("reading json files into df")
-    # create batches of files
-    filebatchsize=100
-    batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
     tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
     # delete tmp dir if it exists
     if os.path.exists(tmp_dir_name):
         os.system("rm -r " + tmp_dir_name)
     os.makedirs(tmp_dir_name)
+
+    # create batches of files
+    filebatchsize=100
+    batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
+
+    # iterate over batches. each batch is stored locally in its own parquet file.
+    dropped_sum = 0
+    total_samples = 0
+    if args.add_source_data:
+        knowledge_kb = parse_retrieval_data.build_dataset(args)
+
     for i in tqdm.tqdm(range(len(batches))):
-        df = None
-        batch = batches[i]
-        for file in batch:
+        df_chunks = []
+        for file in batches[i]:
             data = pd.read_json(file, lines=True) # read data frame from json file
             data = preprocess_data(data, args)  # expensive operation
-            if df is None:
-                df = data
+            if args.add_source_data:
+                retrieval_data = add_retrieval_data(data, knowledge_kb, args)
+                # count number of dropped elements
+                dropped_sum += len(data) - len(retrieval_data)
+                total_samples += len(data)
+                df_chunks.append(retrieval_data)
             else:
-                df = pd.concat([df, data], copy=False, ignore_index=True)
+                df_chunks.append(data)
+                
+        df = pd.concat(df_chunks, copy=False, ignore_index=True)
         batch_fp = tmp_dir_name + "batch_" + str(i) + ".parquet"
         print("finished converting batch nr. ", str(i), "to df")
         df = df.to_parquet(batch_fp, compression=None)
+
+    print("dropped", dropped_sum, "elements")
+    print("total samples", total_samples)
+
     # rename folder from tmp_dir_name to data_dir_name
     # delete data_dir_name if it exists
     if os.path.exists(data_dir_name):
         os.system("rm -r " + data_dir_name)
     
+    # only overwrite old dataset if creation of new one didn't crash until here.
     os.rename(tmp_dir_name, data_dir_name)
     print("saved df to parquet", data_dir_name)
 
 def parquet_to_dataframe(parquet_dir, args):
-    parquet_files = [os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir) if f.endswith('.parquet')]
+    parquet_files = [
+        os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir)
+        if f.endswith('.parquet')
+    ]
     df = pd.read_parquet(parquet_files, engine='pyarrow')
 
     return df
@@ -113,7 +149,7 @@ def preprocess_data(df, args):
 
 
 def create_tokenize_function(tokenizer, args):
-    """Mapping function that tokanizes all relevant dataset entries."""
+    """Mapping function that tokenizes all relevant dataset entries."""
     def tokenize_function(examples):
             inputs = [input for input in examples['text']]
             targets = [target for target in examples['label']]
@@ -134,24 +170,35 @@ def generate_ds_if_not_cached(data_dir_name, args):
         print("parquet file already exists, loading parquet...")
 
 
-def dataset_filepath(args, model_name_or_path):
+def dataset_filepath(args, model_name_or_path:str, dataset_type="") -> str:
     # determine name of dataset based on args
     length_str = "all" 
     if args.samples == -1:
         length_str = str(args.samples)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
-    data_dir_name = args.data_dir[:-1] + "_modelname_" + model_name_or_path +\
+    data_dir_name = args.data_dir[:-1] +\
+        dataset_type +\
+        "_modelname_" + model_name_or_path +\
         "_data_len_" + length_str + "/"
     return data_dir_name
 
 
 def load_dataset(args, model_name_or_path="unspecified"):
-    data_dir_name = dataset_filepath(args, model_name_or_path)
+    dataset_type = ""
+    if args.add_source_data:
+        dataset_type += "haystack_DPR/"
+
+    data_dir_name = dataset_filepath(
+        args, model_name_or_path, 
+        dataset_type=dataset_type
+    )
     tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"
 
     import wandb
-    wandb.config.update({"data_dir_name": data_dir_name})
-    wandb.config.update({"tokenized_data_dir_name": tokenized_data_dir_name})
+    wandb.config.update({
+        "data_dir_name": data_dir_name, "dataset_type": dataset_type,
+        "tokenized_data_dir_name": tokenized_data_dir_name
+    })
 
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
 
@@ -166,7 +213,7 @@ def load_dataset(args, model_name_or_path="unspecified"):
         generate_ds_if_not_cached(data_dir_name, args)
         df = parquet_to_dataset(data_dir_name, args)
 
-        df = df.train_test_split(test_size=0.1)
+        df = df.train_test_split(test_size=0.1 if not args.debug else 0.4)
 
         tokenized_datasets = df.map(
             create_tokenize_function(tokenizer, args=args),

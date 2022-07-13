@@ -4,34 +4,51 @@ import tensorflow as tf
 from tensorflow.nn import ctc_beam_search_decoder
 import matplotlib.pyplot as plt
 import tqdm
+import re
 
 import wandb
 
 
 class SaveModelCallback(tf.keras.callbacks.Callback):
-    def __init__(self, save_path, model, tokenizer, args, training_step=0):
-        self.save_path = save_path
+    def __init__(self, model, tokenizer, args, training_step=0):
         self.model = model
         self.tokenizer = tokenizer
-        self.counter = training_step  # when continuning training from a checkpoint set to non zero.
+        self.training_step = training_step
         self.log_interval=20000
         self.epochcounter = 0
         self.args = args
+
+        self.save_path = "../model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
+        self.save_path += "debug/" if args.debug else ""
+        self.training_step_from_filepath()
+       
+    
+    def training_step_from_filepath(self):
+        self.training_step = 0
+        # when continuning training from a checkpoint set to non zero.
+        if "model_save" in self.args.modelname:
+            # load local checkpoint instead of huggingface hub model
+            # set number of train steps if possible
+            if "_step_" in self.args.modelname:
+                # find first int in string after substring "_steps_"
+                steps_text = self.args.modelname.split("_step_")[-1]
+                self.training_step = int(re.search(r'\d+', steps_text).group())
+
 
     def on_epoch_end(self, epoch, logs=None):
         self.save_model(epoch)
         self.epochcounter += 1
 
     def on_train_batch_end(self, batch, logs=None):
-        self.counter += 1
-        if self.counter % self.log_interval == 0:
+        self.training_step += 1
+        if self.training_step % self.log_interval == 0:
             # self.on_epoch_end(self.epochcounter)
             self.save_model(self.epochcounter)
 
     def save_model(self, epoch):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
-        name = self.save_path + "epoch_" + str(epoch) + "_step_" + str(self.counter * self.args.batchsize)
+        name = self.save_path + "epoch_" + str(epoch) + "_step_" + str(self.training_step * self.args.batchsize)
         self.model.save_pretrained(name)
         self.tokenizer.save_pretrained(name)
         print("Saved model and toknizer to {}".format(name))

@@ -23,12 +23,13 @@ def main():
     args = cmd_arguments()
 
     wandb.init(project="cocite", config=args, mode=args.wandb_mode)
+
     # TODO make from_pytorch dynamic. if tensorflow model or hub model set to false. else True.
     model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=args.from_pytorch)
     tokenized_datasets, tokenizer = cocitedata.load_dataset(args, model_name_or_path=model.name_or_path)
 
-    # initialize model
 
+    ### build datasets
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, return_tensors="tf")
     tokenized_train = tokenized_datasets["train"]
     tokenized_test = tokenized_datasets["test"]
@@ -88,7 +89,7 @@ def main():
     max_k = min(max_k, args.topk) 
     top_ks = [k for k in top_ks if k <= max_k]
 
-
+    ### build callbacks
     metric_fn_test = CustomMetrics(prefix="test_", args=args, top_ks=top_ks).fast_metrics
     metric_fn_train = CustomMetrics(prefix="train_", args=args, top_ks=top_ks).fast_metrics
     metric_test_callback = keras_metric_callback.KerasMetricCallback(
@@ -109,6 +110,7 @@ def main():
         len_train_dataset = len(tokenized_train["label"]),
         top_ks=top_ks,
     )
+
     optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)  # TODO warning high lr
     model.compile(optimizer=optimizer)
 
@@ -120,31 +122,22 @@ def main():
         metric_train_callback,
     ]
 
-
-    if True or not args.debug:
-        modelsave_dir="../model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
-        modelsave_dir += "debug/" if args.debug else ""
-        training_step = 0
-        if "model_save" in args.modelname:
-            # load local checkpoint instead of huggingface hub model
-            # set number of train steps if possible
-            if "_step_" in args.modelname:
-                # find first int in string after substring "_steps_"
-                steps_text = args.modelname.split("_step_")[-1]
-                training_step = int(re.search(r'\d+', steps_text).group())
-
+    if not args.debug:
         save_model_callback = SaveModelCallback(
-            modelsave_dir, model=model,
-            tokenizer=tokenizer, args=args, training_step=training_step)
+            model=model,
+            tokenizer=tokenizer,
+            args=args
+        )
         callbacks.append(save_model_callback)
 
-
+    ### train model
     if not args.notraining:
         if not args.debug:
             tracker = EmissionsTracker()
             tracker.start()
+
         model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs, callbacks=callbacks)
-        # GPU Intensive code goes here
+
         if not args.debug:
             co2_emissions = tracker.stop()
             wandb.log({"CO2_emissions (in Kg)": co2_emissions})
