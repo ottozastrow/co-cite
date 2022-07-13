@@ -226,10 +226,9 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(tokenizer, predictions, labels, inputs=inputs)
         if args.diffsearchindex_training:
-            for i in range(len(predictions)):
-                predictions[i] = predictions[i].split("[SEP]")[0]
+            for i in range(len(decoded_predictions)):
+                decoded_predictions[i] = decoded_predictions[i].split("[SEP]")[0]
     
-
         beams = rearrange_model_generate(decoded_predictions, args)
 
         metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
