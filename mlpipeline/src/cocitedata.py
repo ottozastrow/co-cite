@@ -27,8 +27,8 @@ def add_diffsearchindex_label(sample, args):
     if not sample["found_source"]:
         sample["label_diffsearchindex"] = ""
     else:
-        extract = "[SEP]" + sample["text"]
-        # extract = "[SEP]" + sample["title"] + "[SEP]" + sample["text"]
+        extract = "[SEP]" + sample["sourcetext"]
+        # extract = "[SEP]" + sample["title"] + "[SEP]" + sample["sourcetext"]
         # *6 because I assume num tokens  * 6 > num characters
         # the tokenizer will cut this off at the diffsearchindex_output_tokens
         extract = extract[:args.diffsearchindex_output_tokens * 6]

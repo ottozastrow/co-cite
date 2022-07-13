@@ -93,9 +93,10 @@ def citation_segment_acc(predictions, labels, args):
     accs = []
     for i in range(len(labels)):
         x = predictions[i]
+        y = labels[i]
         if args.diffsearchindex_training:
             x = x.split("[SEP]")[0]
-        y = labels[i]
+            y = y.split("[SEP]")[0]
         x = split_citation_segments(x)
         y = split_citation_segments(y)
         # compute accuracy

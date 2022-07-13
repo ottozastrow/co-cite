@@ -308,28 +308,44 @@ def fuzzy_citation_search(search_str, sections, keys):
     return results
 
 
+def normalize_to_parsed_citation(key):
+    """the citations encountered in the dataset need to be transformed to match those from the parsed statutes"""
+    key = key.replace("38 U.S.C.A. §§", "")
+    key = key.replace("38 U.S.C.A. §", "")
+    key = key.replace("38 u.s.c.a. §", "")
+    key = key.strip()
+    # remove content of brackets from string with re, only if the brackets contain numbers
+    key = re.sub(r'\([0-9]*\)', "", key)
+    # useful for citations like "38 U.S.C.A. § 552 (a)(1)"
+
+    # if last character is a letter, remove it
+    if len(key) > 0 and key[-1].isalpha():
+        section = key[-1]
+        key = key[:-1] + "(" + section.lower() + ")"
+    # useful for citations like "38 U.S.C.A. § 552A"
+    key = "38 U.S.C.A. § " + key
+    return key
+
+
 def retrieve_usca(sample, sections: pd.DataFrame):
     key = sample["label"]
-    
-    if key.endswith(","):
-        key = key[:-1]
+    # imagine a sample like this: "38 U.S.C.A. §§ 552(a), 523"
 
-    # remove content of brackets from string with re
-    # key = re.sub(r'\(.*?\)', "", key)
+    sample["title"] = ""
+    sample["sourcetext"] = ""
+    segments = key.split(",")
+    at_least_one_found = False
+    for segment_orig in segments:
+        
+        segment = normalize_to_parsed_citation(segment_orig)
+        found_source = segment in sections.keys()
+        if found_source:
+            at_least_one_found = True
+            retrieved_groundtruth = sections[segment]
+            sample["title"] += retrieved_groundtruth["title"] + "[SEP]"
+            sample["sourcetext"] += retrieved_groundtruth["sourcetext"] + "[SEP]"
 
-    found_source = key in sections.keys()
-    
-    if found_source:
-        retrieved_groundtruth = sections[key]
-        sample["title"] = retrieved_groundtruth["title"]
-        sample["text"] = retrieved_groundtruth["text"]
-
-    else:
-        # no groundtruth found for", sample["label"]
-        sample["title"] = ""
-        sample["text"] = ""
-
-    sample["found_source"] = found_source
+    sample["found_source"] = at_least_one_found
     return sample
 
 
