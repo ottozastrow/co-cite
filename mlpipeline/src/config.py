@@ -14,6 +14,8 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--noevaluation", help="skip post training evaluation pipeline", action="store_true")
     parser.add_argument("--tokenizer", help="by default is set to same as modelname.", default="")
     parser.add_argument("--debug", help="make data and model tiny for fast local debugging", action="store_true")
+    parser.add_argument("--sample_decoding", help="use nucleus sampling top k as decoding method", action="store_true")
+    parser.add_argument("--temperature", help="for sample decoding", type=int, default=0.7)
 
     ## dataset args
     parser.add_argument("--input_tokens", type=int, help="input token length", default=256)

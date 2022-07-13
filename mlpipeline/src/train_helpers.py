@@ -10,19 +10,22 @@ import wandb
 
 
 class SaveModelCallback(tf.keras.callbacks.Callback):
-    def __init__(self, model, tokenizer, args, training_step=0):
+    def __init__(self, model, tokenizer, args, len_train_dataset, training_step=0):
         self.model = model
         self.tokenizer = tokenizer
         self.training_step = training_step
-        self.log_interval=20000
         self.epochcounter = 0
         self.args = args
+
+        if args.debug:
+            self.log_interval = (len_train_dataset / args.batchsize) // 2 
+        else:
+            self.log_interval = (len_train_dataset / args.batchsize) // 5
 
         self.save_path = "../model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
         self.save_path += "debug/" if args.debug else ""
         self.training_step_from_filepath()
        
-    
     def training_step_from_filepath(self):
         self.training_step = 0
         # when continuning training from a checkpoint set to non zero.
@@ -40,10 +43,10 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
         self.epochcounter += 1
 
     def on_train_batch_end(self, batch, logs=None):
-        self.training_step += 1
-        if self.training_step % self.log_interval == 0:
-            # self.on_epoch_end(self.epochcounter)
+        if self.training_step % self.log_interval == 0 and self.prefix != "train_":
             self.save_model(self.epochcounter)
+
+        self.training_step += 1
 
     def save_model(self, epoch):
         if not os.path.exists(self.save_path):
@@ -222,7 +225,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     for batch in tqdm.tqdm(dataset):
         inputs = batch["input_ids"]
         labels = batch["labels"]
-        modeloutdict = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk,
+        modeloutdict = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk, do_sample=args.sample_decode, temperature=args.temperature,
                                     output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
         scores = modeloutdict["scores"]
         predictions = modeloutdict["sequences"]
@@ -270,8 +273,7 @@ def plot_precision_recall(matches, scores, prefix, top_ks, buckets=40):
     scores_sorted = scores_sorted[::-1]
     # thresholds are periodically taken across sorted scores
     thresholds = [scores_sorted[(len(scores) // buckets) * i] for i in range(buckets)]
-    # import pdb
-    # pdb.set_trace()
+
     for k in top_ks:
         # for every threshold, compute the precision
         precisions = []

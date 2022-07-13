@@ -126,7 +126,8 @@ def main():
         save_model_callback = SaveModelCallback(
             model=model,
             tokenizer=tokenizer,
-            args=args
+            args=args,
+            len_train_dataset = len(tokenized_train["label"]),
         )
         callbacks.append(save_model_callback)
 
