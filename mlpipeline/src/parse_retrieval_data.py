@@ -413,7 +413,7 @@ def build_sources_kb(args, has_chapter_prefix=False):
                 "title": parse_title(text, statutory_kb[p]["child_of"], sections)
             }
             
-            paragraph_lengths.append(len(sections[p]["text"]))
+            paragraph_lengths.append(len(sections[p]["sourcetext"]))
         
     print(len(sections))
     print("mean paragraph length: ", np.mean(paragraph_lengths))
