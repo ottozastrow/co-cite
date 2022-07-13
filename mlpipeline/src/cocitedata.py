@@ -185,7 +185,7 @@ def generate_ds_if_not_cached(data_dir_name, args):
         # delete tmp dir if it exists
         if os.path.exists(tmp_dir_name):
             os.system("rm -r " + tmp_dir_name)
-        os.makedirs(tmp_dir_name)
+        os.makedirs(tmp_dir_name, exist_ok=True)
         
         preprocess_json_and_save_to_parquet(args, tmp_dir_name)
 
