@@ -320,7 +320,7 @@ def retrieve_usca(sample, sections: pd.DataFrame):
     found_source = key in sections.keys()
     
     if found_source:
-        retrieved_groundtruth = sections[sample["label"]]
+        retrieved_groundtruth = sections[key]
         sample["title"] = retrieved_groundtruth["title"]
         sample["text"] = retrieved_groundtruth["text"]
 
