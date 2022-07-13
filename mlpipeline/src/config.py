@@ -53,6 +53,6 @@ def cmd_arguments(debug=False, testargs=None):
         args.input_tokens=8
         args.output_tokens=4
         args.epochs=1
-        args.wandb_mode = "disabled"
+        # args.wandb_mode = "disabled"
     args.contextlength = args.input_tokens * 4
     return args

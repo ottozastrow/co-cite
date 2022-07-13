@@ -269,8 +269,9 @@ def plot_precision_recall(matches, scores, prefix, top_ks, buckets=40):
     scores_sorted = np.sort(scores)
     scores_sorted = scores_sorted[::-1]
     # thresholds are periodically taken across sorted scores
-    thresholds = [scores_sorted[round(len(scores) / buckets) * i] for i in range(buckets)]
-
+    thresholds = [scores_sorted[(len(scores) // buckets) * i] for i in range(buckets)]
+    # import pdb
+    # pdb.set_trace()
     for k in top_ks:
         # for every threshold, compute the precision
         precisions = []
