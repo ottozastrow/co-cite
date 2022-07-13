@@ -211,7 +211,7 @@ def dataset_filepath(args, model_name_or_path:str, dataset_type="") -> str:
         dataset_type += "diffsearchindex_training/"
     
     length_str = "all" 
-    if args.samples == -1:
+    if args.samples != -1:
         length_str = str(args.samples)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
     data_dir_name = args.data_dir[:-1] +\
