@@ -407,7 +407,7 @@ def build_sources_kb(args, has_chapter_prefix=False):
             text = fulltext[span["start"]:span["end"]]
             normalized = normalize_section(text)
             sections[p] = {
-                "text": normalized,
+                "sourcetext": normalized,
                 "citation": prefix + str(p),
                 "child_of": statutory_kb[p]["child_of"],
                 "title": parse_title(text, statutory_kb[p]["child_of"], sections)
