@@ -227,6 +227,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     decoding_latencies = []
     all_scores = []
     samples_table = []
+    predict_with_generate = False
     for batch in tqdm.tqdm(dataset):
         inputs = batch["input_ids"]
         labels = batch["labels"]
@@ -234,12 +235,20 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         # timeit
         start = time.time()
         # generate predictions
-        modeloutdict = model.generate(
-            inputs, num_beams=args.topk,
-            num_return_sequences=args.topk,
-            do_sample=args.sample_decoding, top_k=args.topk,
-            output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
-
+        if predict_with_generate:
+            modeloutdict = model.generate(
+                inputs, num_beams=args.topk,
+                num_return_sequences=args.topk,
+                do_sample=args.sample_decoding, top_k=args.topk,
+                output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
+        else:
+            modeloutput = model.predict({"input_ids": inputs, "decoder_input_ids": inputs})
+            logits = modeloutput.logits
+            sequences = tf.argmax(logits, axis=-1)
+            modeloutdict = {
+                "sequences": sequences,
+                "scores": modeloutput.logits
+            }
         # timeit
         end = time.time()
         decoding_latencies.append(end - start)
@@ -257,8 +266,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             # when args.topk == 1, predictions is a tuple of logits (tensor)
             # of shape seqlen x batchsize x vocabsize
 
-            # goal: for every batch element, perform greedy decoding
-            # per sequence step, take the argmax of the logits, use the index to multply the value 
             scores = tf.convert_to_tensor(scores)
             probabilities = tf.reduce_max(scores, axis=2)
             mean_probabilites = tf.reduce_mean(probabilities, axis=0)
