@@ -40,7 +40,7 @@ for i in range(num_processes):
     # all processes flags
     if len(config["same_flags"]) > 0:
         for item in config["same_flags"]:
-            bsub_string += f" --{item[0]}"
+            bsub_string += f" --{item}"
     print(bsub_string)
     print()
 
