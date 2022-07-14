@@ -16,6 +16,8 @@ all_different_args = config["different"]
 all_different_args.update(config["different_flags"])
 
 keys = list(all_different_args.keys())
+if len(keys) == 0:
+    num_processes = 1
 num_processes = len(all_different_args[keys[0]])
 
 # resolve arguments per process
