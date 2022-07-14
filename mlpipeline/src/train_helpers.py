@@ -7,7 +7,7 @@ from tensorflow.nn import ctc_beam_search_decoder
 import matplotlib.pyplot as plt
 import tqdm
 import re
-
+import time
 import wandb
 
 
@@ -223,16 +223,27 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         top_ks = top_ks[0] # unexplainable bug causes this
     for k in top_ks:
         all_matches[k] = []
+    
+    decoding_latencies = []
     all_scores = []
     samples_table = []
     for batch in tqdm.tqdm(dataset):
         inputs = batch["input_ids"]
         labels = batch["labels"]
+
+        # timeit
+        start = time.time()
+        # generate predictions
         modeloutdict = model.generate(
             inputs, num_beams=args.topk,
             num_return_sequences=args.topk,
             do_sample=args.sample_decoding, top_k=args.topk,
             output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
+
+        # timeit
+        end = time.time()
+        decoding_latencies.append(end - start)
+
         scores = modeloutdict["scores"]
         predictions = modeloutdict["sequences"]
 
@@ -276,6 +287,9 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     wandb_table = wandb.Table(columns=["inputs", "top1 prediction", "label", "scores", "segment_acc", "all_topk_predictions"], data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
+    # log avg decoding latency to wandb
+    wandb.log({prefix + "eval_batch_decoding_latency": np.mean(decoding_latencies)})
+
     metric_output = mean_over_metrics_batches(metric_outputs)
     results = mean_over_metrics_batches(metric_outputs)
     print({'eval_' + prefix: results})
@@ -285,7 +299,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     try:
         plot_precision_recall(all_matches, all_scores, prefix=prefix, top_ks=top_ks)
     except:
-        print("WARNIGN: exception in plot precision recall")
+        print("WARNING: exception in plot precision recall")
     return results
 
 
