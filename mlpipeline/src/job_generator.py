@@ -27,7 +27,7 @@ for i in range(num_processes):
     bsub_string = f'bsub -W {config["minutes"]} -n 1 -R "rusage[mem={config["memory"]},ngpus_excl_p=1]" python train.py'
     
     for item in config["different"].items():
-        bsub_string += f" --{item[0]}={item[1][i]}"
+        bsub_string += f" --{item[0]}='{item[1][i]}'"
 
     # per process flags
     if len(config["different_flags"]) > 0:
@@ -38,7 +38,7 @@ for i in range(num_processes):
     # same keyword args
     for item in config["same"].items():
         if item[1]:
-            bsub_string += f" --{item[0]}={item[1]}"
+            bsub_string += f" --{item[0]}='{item[1]}'"
     # all processes flags
     if len(config["same_flags"]) > 0:
         for flag in config["same_flags"]:
