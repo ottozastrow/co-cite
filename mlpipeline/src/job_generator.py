@@ -31,7 +31,8 @@ for i in range(num_processes):
     # per process flags
     if len(config["different_flags"]) > 0:
         for item in config["different_flags"].items():
-            bsub_string += f" --{item[0]}={item[1][i]}"
+            if item[1][i]:
+                bsub_string += f" --{item[0]}"
     
     # same keyword args
     for item in config["same"].items():
