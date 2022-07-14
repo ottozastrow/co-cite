@@ -18,5 +18,6 @@ same:
   notraining: ''
   samples: '1000'
   topk: '3'
-same_flags:
+same_flags: []
+  # - debug
   # - no_training
