@@ -21,8 +21,11 @@ import re
 
 def main():
     args = cmd_arguments()
-
-    wandb.init(project="cocite", config=args, mode=args.wandb_mode, tags=args.tags.split(","), name=args.runname)
+    if args.tags:
+        tags = args.tags.split(",")
+    else:
+        tags = None
+    wandb.init(project="cocite", config=args, mode=args.wandb_mode, tags=tags, name=args.runname)
 
     # TODO make from_pytorch dynamic. if tensorflow model or hub model set to false. else True.
     model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=args.from_pytorch)
