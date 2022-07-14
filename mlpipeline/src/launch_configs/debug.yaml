@@ -1,0 +1,10 @@
+different: {}
+different_flags: {}
+memory: 22800
+minutes: 100
+same:
+  samples: '1000'
+  topk: '3'
+same_flags:
+  - debug
+  - no_training
