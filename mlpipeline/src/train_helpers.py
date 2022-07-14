@@ -1,6 +1,8 @@
+from lightgbm import early_stopping
 import numpy as np
 import os
 import tensorflow as tf
+from transformers import TFAutoModelForSeq2SeqLM
 from tensorflow.nn import ctc_beam_search_decoder
 import matplotlib.pyplot as plt
 import tqdm
@@ -18,8 +20,10 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
         self.args = args
 
         if args.debug:
-            self.log_interval = (len_train_dataset / args.batchsize) // 2 
+            self.log_interval = (len_train_dataset / args.batchsize) // 2
+            self.log_interval = max(1, self.log_interval)
         else:
+            # schedule logging 5 times per epoch
             self.log_interval = (len_train_dataset / args.batchsize) // 5
 
         self.save_path = "../model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
@@ -179,7 +183,6 @@ class CustomMetrics():
 
 def rearrange_model_generate(predictions, args):
     # annoying reformatting because of transformers.model.generate output is flattened (batchsize x beams)
-    # TODO: check whether output makes sense
     beams = [[] for i in range(args.topk)]
     assert len(predictions) == args.topk * args.batchsize,\
         "assuming this format as output from generate()" + str(len(predictions))
@@ -225,24 +228,41 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     for batch in tqdm.tqdm(dataset):
         inputs = batch["input_ids"]
         labels = batch["labels"]
-        modeloutdict = model.generate(inputs, num_beams=args.topk, num_return_sequences=args.topk, do_sample=args.sample_decode, temperature=args.temperature,
-                                    output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
+        modeloutdict = model.generate(
+            inputs, num_beams=args.topk,
+            num_return_sequences=args.topk,
+            do_sample=args.sample_decoding, top_k=args.topk,
+            output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
         scores = modeloutdict["scores"]
         predictions = modeloutdict["sequences"]
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(tokenizer, predictions, labels, inputs=inputs)
-    
-        beams = rearrange_model_generate(decoded_predictions, args)
+
+        if args.topk != 1:
+            beams = rearrange_model_generate(decoded_predictions, args)
+            scores = list(scores.numpy())
+            scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
+        else:
+            # when args.topk == 1, predictions is a tuple of logits (tensor)
+            # of shape seqlen x batchsize x vocabsize
+
+            # goal: for every batch element, perform greedy decoding
+            # per sequence step, take the argmax of the logits, use the index to multply the value 
+            scores = tf.convert_to_tensor(scores)
+            probabilities = tf.reduce_max(scores, axis=2)
+            mean_probabilites = tf.reduce_mean(probabilities, axis=0)
+
+            scores = [mean_probabilites]
+
+            beams = [decoded_predictions]
 
         metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
 
         # add matches dict to all matches
         for k in list(matches.keys()):
             all_matches[k].extend(matches[k])
-        scores = list(scores.numpy())
-        scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
-        all_scores += scores
         
+        all_scores += scores
         segment_acc = citation_segment_acc(beams[0], decoded_labels, args)
         metric_output[prefix + "segment_accuracy"] = np.mean(segment_acc)
 
@@ -257,13 +277,12 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     wandb.log({prefix + "demo": wandb_table})
 
     metric_output = mean_over_metrics_batches(metric_outputs)
-    all_scores = np.array(all_scores)
-    plot_precision_recall(all_matches, all_scores, prefix=prefix, top_ks=top_ks)
-
     results = mean_over_metrics_batches(metric_outputs)
-
     print({'eval_' + prefix: results})
     wandb.log({'eval_' + prefix: results})
+
+    all_scores = np.array(all_scores)
+    plot_precision_recall(all_matches, all_scores, prefix=prefix, top_ks=top_ks)
     return results
 
 

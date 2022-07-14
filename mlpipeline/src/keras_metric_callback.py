@@ -56,6 +56,7 @@ class KerasMetricCallback(Callback):
         self.eval_dataset = eval_dataset
         if args.debug:
             self.log_interval = (len_train_dataset / batch_size) // 2 
+            self.log_interval = max(1, self.log_interval)
         else:
             self.log_interval = (len_train_dataset / batch_size) // 5
         print("log interval", self.log_interval, "train size", len_train_dataset, "batch size", batch_size)

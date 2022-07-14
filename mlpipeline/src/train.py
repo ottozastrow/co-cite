@@ -22,7 +22,7 @@ import re
 def main():
     args = cmd_arguments()
 
-    wandb.init(project="cocite", config=args, mode=args.wandb_mode)
+    wandb.init(project="cocite", config=args, mode=args.wandb_mode, tags=args.tags.split(","), name=args.runname)
 
     # TODO make from_pytorch dynamic. if tensorflow model or hub model set to false. else True.
     model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=args.from_pytorch)
@@ -84,7 +84,10 @@ def main():
         )
     )
 
-    top_ks = [1, 3, 5, 20]
+    optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)  # TODO warning high lr
+    model.compile(optimizer=optimizer)
+
+    top_ks = [1, 3, 5, 10, 20]
     max_k = max(top_ks)
     max_k = min(max_k, args.topk) 
     top_ks = [k for k in top_ks if k <= max_k]
@@ -110,9 +113,6 @@ def main():
         len_train_dataset = len(tokenized_train["label"]),
         top_ks=top_ks,
     )
-
-    optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)  # TODO warning high lr
-    model.compile(optimizer=optimizer)
 
     wandb_callback = WandbCallback(save_model=not args.debug)
 
