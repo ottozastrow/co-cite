@@ -227,7 +227,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     decoding_latencies = []
     all_scores = []
     samples_table = []
-    predict_with_generate = args.topk > 1 or args.sample_decoding
     for batch in tqdm.tqdm(dataset):
         inputs = batch["input_ids"]
         labels = batch["labels"]
@@ -235,13 +234,15 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         # timeit
         start = time.time()
         # generate predictions
-        if predict_with_generate:
+        if not args.fast_predict:
             modeloutdict = model.generate(
                 inputs, num_beams=args.topk,
                 num_return_sequences=args.topk,
                 do_sample=args.sample_decoding, top_k=args.topk,
                 output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
         else:
+            assert not (args.topk > 1 or args.sample_decoding), "fast predict doesn't support beam search"
+            
             modeloutput = model.predict({"input_ids": inputs, "decoder_input_ids": inputs})
             logits = modeloutput.logits
             sequences = tf.argmax(logits, axis=-1)

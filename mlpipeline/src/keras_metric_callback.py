@@ -31,7 +31,6 @@ class KerasMetricCallback(Callback):
         output_cols: Optional[List[str]] = None,
         label_cols: Optional[List[str]] = None,
         batch_size: int = 1,
-        predict_with_generate: Optional[bool] = False,
         prefix: Optional[str] = None,
         len_train_dataset: int = 0,
     ):
@@ -61,7 +60,6 @@ class KerasMetricCallback(Callback):
             self.log_interval = (len_train_dataset / batch_size) // 5
         print("log interval", self.log_interval, "train size", len_train_dataset, "batch size", batch_size)
 
-        self.predict_with_generate = predict_with_generate
         self.output_cols = output_cols
         # This next block attempts to parse out which elements of the dataset should be appended to the labels list
         # that is passed to the metric_fn

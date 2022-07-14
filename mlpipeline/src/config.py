@@ -23,6 +23,7 @@ def cmd_arguments(debug=False, testargs=None):
     ### decoding arguments
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
     parser.add_argument("--sample_decoding", help="use nucleus sampling top k as decoding method", action="store_true")
+    parser.add_argument("--fast_predict", help="use model.predict instead of model.generate. is 6x faster. doesnt support beamsearch or sampling", action="store_true")
     parser.add_argument("--temperature", help="for sample decoding", type=int, default=0.7)
 
     ## dataset arguments
