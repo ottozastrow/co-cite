@@ -5,7 +5,7 @@ import yaml
 import argparse
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--config_yaml", type=str, help="yaml file containing config", default="launch_configs/democonfig.yaml")
+parser.add_argument("--config_yaml", type=str, help="yaml file containing config", default='launch_configs/debug.yaml')
 args = parser.parse_args()
 
 # load yaml file
