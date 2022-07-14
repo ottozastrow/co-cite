@@ -15,12 +15,16 @@ different_flags:
   - false
   - true
   - false
+  fast_predict:
+  - false
+  - false
+  - false
+  - true
 memory: 22800
 minutes: 1000
 same:
   modelname: "../model_save/../model_save/scotus_opinions/scotus opinions bart/_35ovjjw5/epoch_3_step_168128"
   tags: 'latency_test_v6'
   samples: '1000'
-  topk: '3'
 same_flags:
   - notraining
