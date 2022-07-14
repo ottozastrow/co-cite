@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from sympy import Q
 import tensorflow as tf
 from transformers import TFAutoModelForSeq2SeqLM
 from tensorflow.nn import ctc_beam_search_decoder
@@ -251,7 +252,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             probabilities = tf.reduce_max(scores, axis=2)
             mean_probabilites = tf.reduce_mean(probabilities, axis=0)
 
-            scores = [mean_probabilites]
+            scores = mean_probabilites.numpy().tolist()
 
             beams = [decoded_predictions]
 
