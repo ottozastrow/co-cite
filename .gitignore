@@ -1,6 +1,5 @@
 # dataset
 *.csv
-*.json
 *.txt
 **.zip
 **.gz
@@ -15,6 +14,7 @@ data/
 **/results/
 **/model_save/
 **.html
+**/.vscode**
 
 **/huggingface_cache/
 
