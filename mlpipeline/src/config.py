@@ -11,7 +11,7 @@ def cmd_arguments(debug=False, testargs=None):
 
     ## wandb arguments
     parser.add_argument("--runname", help="name of the run in wandb", default=None)
-    parser.add_argument("--tags", help="comma seperated list of tags", default="")
+    parser.add_argument("--tags", help="comma seperated list of tags", default=None)
     parser.add_argument("--wandb_mode", help="online, offline or disabled mode for wandb logging", default="online")
 
     ### training arguments
