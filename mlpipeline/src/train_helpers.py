@@ -282,7 +282,10 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     wandb.log({'eval_' + prefix: results})
 
     all_scores = np.array(all_scores)
-    plot_precision_recall(all_matches, all_scores, prefix=prefix, top_ks=top_ks)
+    try:
+        plot_precision_recall(all_matches, all_scores, prefix=prefix, top_ks=top_ks)
+    except:
+        print("WARNIGN: exception in plot precision recall")
     return results
 
 
