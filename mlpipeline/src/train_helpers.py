@@ -227,7 +227,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     decoding_latencies = []
     all_scores = []
     samples_table = []
-    predict_with_generate = False
+    predict_with_generate = args.topk > 1 or args.sample_decoding
     for batch in tqdm.tqdm(dataset):
         inputs = batch["input_ids"]
         labels = batch["labels"]

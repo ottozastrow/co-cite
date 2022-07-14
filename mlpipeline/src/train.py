@@ -95,13 +95,12 @@ def main():
     ### build callbacks
     metric_fn_test = CustomMetrics(prefix="test_", args=args, top_ks=top_ks).fast_metrics
     metric_fn_train = CustomMetrics(prefix="train_", args=args, top_ks=top_ks).fast_metrics
-    predict_with_generate = False
     metric_test_callback = keras_metric_callback.KerasMetricCallback(
         model=model,
         tokenizer=tokenizer,
         metric_fn=metric_fn_test,
         eval_dataset=generation_test_dataset, prefix="test_",
-        predict_with_generate=predict_with_generate, args=args, batch_size=args.batchsize,
+        args=args, batch_size=args.batchsize,
         len_train_dataset = len(tokenized_train["label"]),
         top_ks=top_ks,
     )
@@ -110,7 +109,7 @@ def main():
         tokenizer=tokenizer,
         metric_fn=metric_fn_train,
         eval_dataset=generation_train_dataset, prefix="train_",
-        predict_with_generate=predict_with_generate, args=args, batch_size=args.batchsize,
+        args=args, batch_size=args.batchsize,
         len_train_dataset = len(tokenized_train["label"]),
         top_ks=top_ks,
     )
