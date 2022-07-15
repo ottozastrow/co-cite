@@ -6,7 +6,9 @@ import argparse
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--config_yaml", type=str, help="yaml file containing config", default='launch_configs/debug.yaml')
+parser.add_argument("--only", help="of all configs in this file only run number 1,2 ", type=str, default=None)
 args = parser.parse_args()
+
 
 # load yaml file
 with open(args.config_yaml, "r") as f:
@@ -21,8 +23,13 @@ if len(keys) == 0:
 else:
     num_processes = len(all_different_args[keys[0]])
 
+processes = list(range(num_processes))
+if args.only:
+    only_indexes = args.only.split(",")
+    processes = [int(i) for i in only_indexes]
+
 # resolve arguments per process
-for i in range(num_processes):
+for i in processes:
     # all processes args
     bsub_string = f'bsub -W {config["minutes"]} -n 1 -R "rusage[mem={config["memory"]},ngpus_excl_p=1]" python train.py'
     
