@@ -105,12 +105,15 @@ class KerasMetricCallback(Callback):
         max_len = max([batch.shape[1] for batch in batches])
         num_samples = sum([batch.shape[0] for batch in batches])
         output = np.full_like(
-            batches[0], fill_value=padding_index, shape=[num_samples, max_len] + list(batches[0].shape[2:])
+            batches[0],
+            fill_value=padding_index,
+            shape=[num_samples, max_len] + list(batches[0].shape[2:])
         )
-        # i keeps track of which part of the concatenated array we're writing the next batch to
+        # i keeps track of which part of the
+        # concatenated array we're writing the next batch to
         i = 0
         for batch in batches:
-            output[i : i + len(batch), : batch.shape[1]] = batch
+            output[i: i + len(batch), : batch.shape[1]] = batch
             i += len(batch)
         return output
 
@@ -137,8 +140,10 @@ class KerasMetricCallback(Callback):
         return outputs
 
     def on_epoch_end(self, epoch, logs=None):
-        train_helpers.evaluate(self.model, self.eval_dataset, self.metric_fn, prefix=self.prefix, args=self.args, top_ks=self.top_ks, tokenizer=self.tokenizer)
-
+        train_helpers.evaluate(
+            self.model, self.eval_dataset, self.metric_fn,
+            prefix=self.prefix, args=self.args, top_ks=self.top_ks,
+            tokenizer=self.tokenizer)
 
     def on_train_batch_end(self, batch, logs=None):
         if self.step_num % self.log_interval == 0 and self.prefix != "train_":
