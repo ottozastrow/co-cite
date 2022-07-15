@@ -1,8 +1,10 @@
 import json
-import pandas as pd
-import numpy as np
 
-from train_helpers import citation_segment_acc, split_citation_segments
+import numpy as np
+import pandas as pd
+
+from citation_normalization import split_citation_segments
+from train_helpers import citation_segment_acc
 
 
 def test_segmentize_statute():

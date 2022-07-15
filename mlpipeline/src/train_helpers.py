@@ -1,14 +1,14 @@
-import numpy as np
 import os
-from sympy import Q
-import tensorflow as tf
-from transformers import TFAutoModelForSeq2SeqLM
-from tensorflow.nn import ctc_beam_search_decoder
-import matplotlib.pyplot as plt
-import tqdm
 import re
 import time
+
+import matplotlib.pyplot as plt
+import numpy as np
+import tensorflow as tf
+import tqdm
 import wandb
+
+import citation_normalization
 
 
 class SaveModelCallback(tf.keras.callbacks.Callback):
@@ -71,189 +71,6 @@ def normalize(x):
     return x.lower().replace(" ", "").replace("(", "").replace(")", "")
 
 
-def book_from_statute(statute) -> str:
-    """
-    returns the book from a statute
-    38 U.S.C.A. §§ 5100, 5102, 5103,  -> 38u.s.c.a.
-    if only u.s.c. is given, return u.s.c.a.
-    # some statutes are missing their §. e.g. 38 C.F.R. 3.321(b)(1)
-    """
-    statute = statute.replace(" ", "").lower()
-
-    if len(statute.split("§")) == 1:
-        statute = statute.replace("38u.s.c.a.", "38u.s.c.a.§")
-        statute = statute.replace("38cfr", "38cfr§")
-        statute = statute.replace("38c.f.r.", "38c.f.r.§")
-
-    book = statute.split("§")[0]
-    if book == "38u.s.c.":
-        book = "38u.s.c.a."
-    book_no_dot = book.replace(".", "")
-    if "cfr" in book_no_dot:
-        book = "38 C.F.R."
-    elif "usca" in book_no_dot:
-        book = "38 U.S.C.A."
-    return book
-
-
-def remove_last_numeric_brackets(x):
-    """
-    removes last bracket from inputs, if the content is numeric
-    """
-    if len(x) > 2 and x[-1] == ")" and x[-2].isnumeric():
-        x = x.rsplit("(", 1)[0]
-    return x
-
-
-def sections_from_statute(
-        statute,
-        remove_subsubsections,
-        remove_subsections=True
-        ) -> list[str]:
-    """
-    returns the book from a statute
-    38 U.S.C.A. §§ 5100, 5102, 5103A,  -> [5100, 5102, 5103A]
-    """
-    statute = statute.replace(" ", "").lower()
-
-    if len(statute.split("§")) == 1:
-        statute = statute.replace("38u.s.c.a.", "38u.s.c.a.§")
-        statute = statute.replace("38cfr", "38cfr§")
-        statute = statute.replace("38c.f.r.", "38c.f.r.§")
-
-    sections = statute.split("§")[-1]
-    sections = sections.split(",")
-    if remove_subsubsections:
-        # remove trailing brackets from sections if the content is numeric
-        sections = [remove_last_numeric_brackets(section)
-                    for section in sections]
-
-    # remove leftover brackets (but leave content)
-    sections = [section.replace("(", "").replace(")", "")
-                for section in sections
-                if section != ""]
-
-    if remove_subsections:
-        new_sections = []
-        for section in sections:
-            # if last letter not numeric
-            if section[-1] not in "0123456789":
-                section = section[:-1]
-            new_sections.append(section)
-        sections = new_sections
-
-    assert len(sections) > 0, "no sections found in statute"
-    for section in sections:
-        assert(len(section)) > 0, "section is empty"
-    return sections
-
-
-def normalize_section(section):
-    return section.replace(" ", "").replace("(", "").replace(")", "").lower()
-
-
-def normalize_case(inputs_orig):
-    # remove trailing brackets from sections if the content is numeric
-    # e.g. (1998)
-    inputs = remove_last_numeric_brackets(inputs_orig)
-
-    # check if inputs begins with see
-    lowered_inputs = inputs.lower()
-
-    law_categories = [
-        ("Vet. App.", r"vet\.? ?app\.?"),
-        ("F.3d", r"f\.? ?3d?"),
-        ("F.2d", r"f\.? ?2d?"),
-        ("F.d", r"f\.? ?d"),
-        ("F. supp", r"f\.? ?supp.?"),
-        ("Fed. Cir.", r"fed\.? ?cir\.?"),
-    ]
-    patterns = []
-    for category, regex in law_categories:
-        patterns.append((category, re.compile(regex)))
-
-    """
-    See Combee v. Brown, 34 F.3d 1039, 1042
-    See Combee v. Brown, 34 F. 3
-    normalized [combeevbrown34 f3]
-    there are many such examples, where F.3d and F.3 are used interchangebly
-    """
-    # TODO support multiple categories per citation (always use the first one)
-
-    for category, pattern in patterns:
-        span = pattern.search(lowered_inputs)
-        if span:
-            participants = inputs[:span.start()].strip()
-
-            details = inputs[span.end():].strip()
-            details = details.replace(" ", "")
-            details = details.lower()
-
-            details = details.split("-")[0]
-            details = details.split("(")[0]
-            details = details.split(",")[0]
-
-            # remove trailing symbols
-            details = details.replace("(", "")
-            details = details.replace(")", "")
-            details = details.replace("-", "")
-            details = details.replace(".", "")
-            details = details.replace(",", "")
-
-            inputs = participants + " " + category + " " + details
-            break
-
-    return inputs
-
-
-def split_citation_segments(inputs, remove_subsubsections=True) -> list[str]:
-    """
-    splits a citation into segments
-    38 U.S.C.A. §§ 5100A, 5102(a)(1) becomes
-    [38 U.S.C.A. § 5100a, 38 U.S.C.A. § 5102a]
-
-    or if its not a statute
-
-    transforms from
-    See Moreau v. Brown, 9 Vet. App. 389, 396 (1996)
-    to
-    [Moreau v. Brown, 9 Vet. App. 389, 396]
-    explanations:
-    - "see" or trailing commas are not part
-    of the citation but often in the data
-    - year numbers (1997) are not always present
-    - in Vet. App. 389, 396  we have the appendix
-    389 but page number 396. the page number is often not present
-    """
-
-    # regex pattern for if "see" or "eg" "in" is at beginning of string
-    # has to work for "See, " "e.g. ", "See in ", ...
-    useless_prefix = re.compile(r"((see|e\.g\.|in)\.?\,? )+")
-
-    useless_prefix_span = useless_prefix.search(inputs.lower())
-    if useless_prefix_span:
-        if useless_prefix_span.start() == 0:
-            inputs = inputs[useless_prefix_span.end():]
-    try:
-        x = inputs.lower()
-        is_case = "§" not in x\
-            and "c.f.r" not in x\
-            and "u.s.c.a" not in x\
-            and "u.s.c." not in x
-        if not is_case:
-            book = book_from_statute(inputs)
-            sections = sections_from_statute(inputs, remove_subsubsections)
-            segments = [book + " § " + section for section in sections]
-            return segments
-        else:
-            inputs = normalize_case(inputs)
-            return [inputs]
-    except Exception as e:
-        print(e)
-        print("inputs:", inputs)
-        return [inputs]
-
-
 def citation_segment_acc(predictions, labels, args=None):
     """
     assumes batched inputs
@@ -274,8 +91,8 @@ def citation_segment_acc(predictions, labels, args=None):
             if args.diffsearchindex_training:
                 x = x.split("[SEP]")[0]
                 y = y.split("[SEP]")[0]
-        x = split_citation_segments(x)
-        y = split_citation_segments(y)
+        x = citation_normalization.split_citation_segments(x)
+        y = citation_normalization.split_citation_segments(y)
         # compute accuracy
         # builds on assumption that x and y don't contain duplicates.
         # in the BVA corpus, this is true.
@@ -287,27 +104,26 @@ def citation_segment_acc(predictions, labels, args=None):
             for xi in x:
                 contains.append(yi in xi)
             contained.append(any(contains))
-        # import pdb
-        # pdb.set_trace()
         accs.extend(contained)
     return accs
 
 
-def logits_to_topk(logits, k):
-    # use beam search to get the top k predictions
-    # tf requires length x batchsize x num_classes
-    logits_tf = tf.reshape(logits, (logits.shape[1], logits.shape[0], logits.shape[2]))
-    sequence_length = tf.ones(logits.shape[0], dtype=tf.int32) * logits.shape[1]
+# def logits_to_topk(logits, k):
+#     # use beam search to get the top k predictions
+#     # tf requires length x batchsize x num_classes
+#     logits_tf = tf.reshape(logits, (logits.shape[1], logits.shape[0], logits.shape[2]))
+#     sequence_length = tf.ones(logits.shape[0], dtype=tf.int32) * logits.shape[1]
 
-    beams, log_probs = ctc_beam_search_decoder(
-        logits_tf, sequence_length=sequence_length, 
-        beam_width=k,
-        top_paths=k
-    )
+#     beams, log_probs = ctc_beam_search_decoder(
+#         logits_tf, sequence_length=sequence_length, 
+#         beam_width=k,
+#         top_paths=k
+#     )
 
-    beams = [tf.sparse.to_dense(b) for b in beams]
+#     beams = [tf.sparse.to_dense(b) for b in beams]
 
-    return beams, log_probs
+#     return beams, log_probs
+
 
 class CustomMetrics():
     def __init__(self, prefix, args, top_ks):
@@ -381,6 +197,7 @@ def batch_accuracy(predictions, labels):
 
     return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
 
+
 def tokens_2_words(tokenizer, predictions, labels, inputs=None):
     predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
@@ -396,13 +213,14 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     print("starting eval" + prefix)
     metric_outputs = []
     all_matches = {}
-    segment_accs = []  # a given target may contain several segments. here accuracy is computed for each segment
+    segment_accs = []  # a given target may contain several segments.
+    # here accuracy is computed for each segment
     # if top_ks isnatnce of tuple
     if isinstance(top_ks, tuple):
-        top_ks = top_ks[0] # unexplainable bug causes this
+        top_ks = top_ks[0]  # unexplainable bug causes this
     for k in top_ks:
         all_matches[k] = []
-    
+
     decoding_latencies = []
     all_scores = []
     samples_table = []
@@ -421,7 +239,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
                 output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
         else:
             assert not (args.topk > 1 or args.sample_decoding), "fast predict doesn't support beam search"
-            
+
             modeloutput = model.predict({"input_ids": inputs, "decoder_input_ids": inputs})
             logits = modeloutput.logits
 
@@ -460,14 +278,14 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         # add matches dict to all matches
         for k in list(matches.keys()):
             all_matches[k].extend(matches[k])
-        
+
         all_scores += scores
         segment_acc = citation_segment_acc(beams[0], decoded_labels, args)
         segment_accs.append(segment_acc)
 
         # change dim ordering of list of lists
         beams_reorderd = [list(i) for i in zip(*beams)]
-        
+
         metric_outputs.append(metric_output)
         rows = [list(t) for t in zip(
                     decoded_inputs, beams[0], decoded_labels,
@@ -530,6 +348,7 @@ def plot_precision_recall(matches, scores, top_ks, buckets=40):
 
     return plt
 
+
 def mean_over_metrics_batches(batchwise_metrics):
     # iterate through keys and items in metric_outputs and compute mean
     # create numpy array from list of dicts
@@ -541,4 +360,3 @@ def mean_over_metrics_batches(batchwise_metrics):
             values.append(batch[key])
         metric_outputs[key] = np.mean(values)
     return metric_outputs
-
