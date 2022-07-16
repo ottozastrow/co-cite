@@ -245,7 +245,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             modeloutdict = model.generate(
                 inputs, num_beams=args.topk,
                 num_return_sequences=args.topk,
-                do_sample=args.sample_decoding, top_k=args.topk,
+                do_sample=args.sample_decoding, top_k=args.topk, early_stopping=True,
                 output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
         else:
             assert not (args.topk > 1 or args.sample_decoding), "fast predict doesn't support beam search"
