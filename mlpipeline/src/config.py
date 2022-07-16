@@ -8,6 +8,7 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--from_pytorch", help="load from pytorch model", action="store_true")
     parser.add_argument("--retriever", type=str, help="retriever type from 'bm25'|'dpr'|'embedding'", default="bm25")
     parser.add_argument("--tokenizer", help="by default is set to same as modelname.", default="")
+    parser.add_argument("--co2_tracking", help="co2 tracker is enabled", action="store_true")
 
     ## wandb arguments
     parser.add_argument("--runname", help="name of the run in wandb", default=None)

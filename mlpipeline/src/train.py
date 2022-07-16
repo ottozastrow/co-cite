@@ -132,13 +132,13 @@ def main():
 
     ### train model
     if not args.notraining:
-        if not args.debug:
+        if not args.debug and args.co2_tracking:
             tracker = EmissionsTracker()
             tracker.start()
 
         model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs, callbacks=callbacks)
 
-        if not args.debug:
+        if not args.debug and args.co2_tracking:
             co2_emissions = tracker.stop()
             wandb.log({"CO2_emissions (in Kg)": co2_emissions})
 
