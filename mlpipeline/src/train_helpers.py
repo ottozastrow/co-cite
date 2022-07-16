@@ -290,14 +290,14 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             all_matches[k].extend(matches[k])
 
         all_scores += scores
-        segment_accs_no_subsections.append(
+        segment_accs_no_subsections.extend(
             citation_segment_acc(
                 beams[0], decoded_labels,
                 remove_subsections=True, remove_subsubsections=True,
                 args=args,
             )
         )
-        segment_accs_with_subsubsections.append(
+        segment_accs_with_subsubsections.extend(
             citation_segment_acc(
                 beams[0], decoded_labels,
                 remove_subsections=False, remove_subsubsections=False,
@@ -308,7 +308,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         segment_acc = citation_segment_acc(
             beams[0], decoded_labels, args=args,
             remove_subsections=False, remove_subsubsections=True)
-        segment_accs.append(segment_acc)
+        segment_accs.extend(segment_acc)
 
         # change dim ordering of list of lists
         beams_reorderd = [list(i) for i in zip(*beams)]
