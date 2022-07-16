@@ -19,6 +19,7 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--notraining", help="skip training pipeline", action="store_true")
     parser.add_argument("--noevaluation", help="skip post training evaluation pipeline", action="store_true")
     parser.add_argument("--debug", help="make data and model tiny for fast local debugging", action="store_true")
+    parser.add_argument("--evaluations_per_epoch", help="how often to run evaluation during an epoch", default=3, type=int)
 
     ### decoding arguments
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)

@@ -24,7 +24,7 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
             self.log_interval = max(1, self.log_interval)
         else:
             # schedule logging 5 times per epoch
-            self.log_interval = (len_train_dataset / args.batchsize) // 3
+            self.log_interval = (len_train_dataset / args.batchsize) // args.evaluations_per_epoch
 
         self.save_path = "../model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
         self.save_path += "debug/" if args.debug else ""
