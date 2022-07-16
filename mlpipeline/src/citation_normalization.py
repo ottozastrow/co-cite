@@ -162,8 +162,10 @@ def normalize_statute(
         inputs,
         remove_subsubsections=remove_subsubsections,
         remove_subsections=remove_subsections)
-    txt = book + " §§ " + ", ".join(sections)
-    return txt
+    if len(sections) == 1:
+        return book + " § " + sections[0]
+    else:
+        return book + " §§ " + ", ".join(sections)
 
 
 def remove_useless_prefix(inputs) -> str:
