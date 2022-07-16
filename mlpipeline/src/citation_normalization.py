@@ -1,5 +1,6 @@
 import re
 
+
 def book_from_statute(statute) -> str:
     """
     returns the book from a statute
@@ -35,7 +36,7 @@ def remove_last_numeric_brackets(x):
 
 
 def sections_from_statute(
-        statute,
+        statute_orig,
         remove_subsubsections,
         remove_subsections=True
         ) -> list[str]:
@@ -43,7 +44,7 @@ def sections_from_statute(
     returns the book from a statute
     38 U.S.C.A. §§ 5100, 5102, 5103A,  -> [5100, 5102, 5103A]
     """
-    statute = statute.replace(" ", "").lower()
+    statute = statute_orig.replace(" ", "").lower()
 
     if len(statute.split("§")) == 1:
         statute = statute.replace("38u.s.c.a.", "38u.s.c.a.§")
@@ -82,9 +83,11 @@ def normalize_section(section):
 
 
 def normalize_case(inputs_orig):
+    inputs = remove_useless_prefix(inputs_orig)
+
     # remove trailing brackets from sections if the content is numeric
     # e.g. (1998)
-    inputs = remove_last_numeric_brackets(inputs_orig)
+    inputs = remove_last_numeric_brackets(inputs)
 
     # check if inputs begins with see
     lowered_inputs = inputs.lower()
@@ -135,10 +138,51 @@ def normalize_case(inputs_orig):
     return inputs
 
 
-def split_citation_segments(
+def normalize_and_segmentize_statute(inputs) -> list[str]:
+    inputs = remove_useless_prefix(inputs)
+
+    book = book_from_statute(inputs)
+
+    sections = sections_from_statute(
         inputs,
         remove_subsubsections=True,
-        remove_subsections=False) -> list[str]:
+        remove_subsections=False)
+    segments = [book + " § " + section for section in sections]
+    return segments
+
+
+def normalize_statute(inputs) -> str:
+    """ does not split into segments"""
+    inputs = remove_useless_prefix(inputs)
+    book = book_from_statute(inputs)
+
+    sections = sections_from_statute(
+        inputs,
+        remove_subsubsections=True,
+        remove_subsections=False)
+    txt = book + " §§ " + ", ".join(sections)
+    return txt
+
+
+def remove_useless_prefix(inputs) -> str:
+    """
+    regex pattern for if "see" or "eg" "in" is at beginning of string
+    has to work for "See, " "e.g. ", "See in ", ...
+    """
+    useless_prefix = re.compile(r"((see|e\.g\.|in)\.?\,? )+")
+
+    useless_prefix_span = useless_prefix.search(inputs.lower())
+    if useless_prefix_span:
+        if useless_prefix_span.start() == 0:
+            inputs = inputs[useless_prefix_span.end():]
+    return inputs
+
+
+def normalize_citations(
+        inputs,
+        segmentize=False,
+        remove_subsubsections=True,
+        remove_subsections=False):
     """
     splits a citation into segments
     38 U.S.C.A. §§ 5100A, 5102(a)(1) becomes
@@ -158,31 +202,24 @@ def split_citation_segments(
     389 but page number 396. the page number is often not present
     """
 
-    # regex pattern for if "see" or "eg" "in" is at beginning of string
-    # has to work for "See, " "e.g. ", "See in ", ...
-    useless_prefix = re.compile(r"((see|e\.g\.|in)\.?\,? )+")
-
-    useless_prefix_span = useless_prefix.search(inputs.lower())
-    if useless_prefix_span:
-        if useless_prefix_span.start() == 0:
-            inputs = inputs[useless_prefix_span.end():]
     try:
         x = inputs.lower()
         is_case = "§" not in x\
             and "c.f.r" not in x\
             and "u.s.c.a" not in x\
             and "u.s.c." not in x
-        if not is_case:
-            book = book_from_statute(inputs)
-            sections = sections_from_statute(
-                inputs,
-                remove_subsubsections,
-                remove_subsections=remove_subsections)
-            segments = [book + " § " + section for section in sections]
-            return segments
+        if segmentize:
+            if not is_case:
+                return normalize_and_segmentize_statute(inputs)
+            else:
+                inputs = normalize_case(inputs)
+                return [inputs]
         else:
-            inputs = normalize_case(inputs)
-            return [inputs]
+            if not is_case:
+                return normalize_statute(inputs)
+            else:
+                return normalize_case(inputs)
+
     except Exception as e:
         print(e)
         print("inputs:", inputs)

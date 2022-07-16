@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from citation_normalization import split_citation_segments
+from citation_normalization import normalize_citations
 from train_helpers import citation_segment_acc
 
 
@@ -14,7 +14,7 @@ def test_segmentize_statute():
     """
     x = "38 U.S.C.A. §§ 5100A, 5102(a)(1)"
     y = ["38u.s.c.a.§5100a", "38u.s.c.a.§5102a"]
-    ynew = split_citation_segments(x)
+    ynew = normalize_citations(x, segmentize=True)
     assert ynew == y, ynew
 
 
@@ -26,7 +26,7 @@ def test_segemntize_case():
     """
     x = "See Moreau v. Brown, 9 Vet. App. 389, 396 (1996)"
     y = ["moreauv.brown,9 vet.app. 389"]
-    ynew = split_citation_segments(x)
+    ynew = normalize_citations(x, segmentize=True)
     assert ynew == y, ynew
 
 
@@ -40,7 +40,8 @@ def get_examples():
         """
     )
 
-    # both fed.cir. and f.3d found, but since fed.cir. is detected first it behaves as if its the only one.
+    # both fed.cir. and f.3d found, but since fed.cir.
+    # is detected first it behaves as if its the only one.
     examples.append(
         """
         731 F.3d 1303, 1315 (Fed. Cir. 2013
@@ -52,6 +53,7 @@ def get_examples():
 
 # test_segemntize_case()
 # test_segmentize_statute()
+
 
 def reevaluate_table():
     preds_table_file = "../../data/test_demo_3_8a66f2801063e5ea77bc.table.json"
@@ -69,11 +71,11 @@ def reevaluate_table():
         axis=1,
     )
     df["segment_label"] = df.apply(
-        lambda row: split_citation_segments(row["label"]), axis=1
+        lambda row: normalize_citations(row["label"]), axis=1
     )
 
     df["pred_label"] = df.apply(
-        lambda row: split_citation_segments(row["top1 prediction"]), axis=1
+        lambda row: normalize_citations(row["top1 prediction"]), axis=1
     )
     df["avg_newsegacc"] = df.apply(
         lambda row: np.mean(row["new_segment_acc"]), axis=1

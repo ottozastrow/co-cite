@@ -59,9 +59,12 @@ def main():
     ds_len = len(tokenized_test["label"])
     num_demo_samples = max(100, ds_len // 10)
     num_demo_samples = min(10000, num_demo_samples)
+
     if num_demo_samples > ds_len:
         num_demo_samples = ds_len
-    
+
+    wandb.summary.update({"num_demo_samples": num_demo_samples})
+
     generation_test_dataset = (
         tokenized_test
         .shuffle()

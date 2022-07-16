@@ -71,7 +71,9 @@ def normalize(x):
     return x.lower().replace(" ", "").replace("(", "").replace(")", "")
 
 
-def citation_segment_acc(predictions, labels, args=None):
+def citation_segment_acc(
+        predictions, labels,
+        remove_subsections, remove_subsubsections, args=None) -> list[bool]:
     """
     assumes batched inputs
 
@@ -91,8 +93,16 @@ def citation_segment_acc(predictions, labels, args=None):
             if args.diffsearchindex_training:
                 x = x.split("[SEP]")[0]
                 y = y.split("[SEP]")[0]
-        x = citation_normalization.split_citation_segments(x)
-        y = citation_normalization.split_citation_segments(y)
+        x = citation_normalization.normalize_citations(
+            x,
+            remove_subsections=remove_subsections,
+            remove_subsubsections=remove_subsubsections,
+            segmentize=True)
+        y = citation_normalization.normalize_citations(
+            y,
+            remove_subsections=remove_subsections,
+            remove_subsubsections=remove_subsubsections,
+            segmentize=True)
         # compute accuracy
         # builds on assumption that x and y don't contain duplicates.
         # in the BVA corpus, this is true.
@@ -214,6 +224,8 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     metric_outputs = []
     all_matches = {}
     segment_accs = []  # a given target may contain several segments.
+    segment_accs_with_subsubsections = []
+    segment_accs_no_subsections = []
     # here accuracy is computed for each segment
     # if top_ks isnatnce of tuple
     if isinstance(top_ks, tuple):
@@ -280,7 +292,24 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             all_matches[k].extend(matches[k])
 
         all_scores += scores
-        segment_acc = citation_segment_acc(beams[0], decoded_labels, args)
+        segment_accs_no_subsections.append(
+            citation_segment_acc(
+                beams[0], decoded_labels,
+                remove_subsections=True, remove_subsubsections=True,
+                args=args,
+            )
+        )
+        segment_accs_with_subsubsections.append(
+            citation_segment_acc(
+                beams[0], decoded_labels,
+                remove_subsections=False, remove_subsubsections=False,
+                args=args,
+                )
+            )
+
+        segment_acc = citation_segment_acc(
+            beams[0], decoded_labels, args=args,
+            remove_subsections=False, remove_subsubsections=True)
         segment_accs.append(segment_acc)
 
         # change dim ordering of list of lists
@@ -302,6 +331,8 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     results = mean_over_metrics_batches(metric_outputs)
     results["segment_acc"] = np.mean(segment_accs)
+    results["segment_acc_no_subsections"] = np.mean(segment_accs_no_subsections)
+    results["segment_acc_with_subsubsections"] = np.mean(segment_accs_with_subsubsections)
     print({prefix: results})
     wandb.log({prefix: results})
 

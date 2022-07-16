@@ -36,7 +36,7 @@ def cmd_arguments(debug=False, testargs=None):
                         type=int, default=-1)
     parser.add_argument("--data_dir", help="directory where data is stored",
                         default="../../../external_projects/bva-citation-prediction/data/preprocessed-cached/preprocessed-cached-v4/")
-    
+
     ### source dataset arguments (diffsearchindex)
     parser.add_argument("--add_source_data", help="set to add document sources per citation", action="store_true")
     parser.add_argument("--rebuild_source_kb", help="set to rebuild and cache kb for sources per citation", action="store_true")
@@ -48,7 +48,7 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--drop_citations_without_source",
                         help="when add_source_data is set, drop all samples where no source was found",
                         action="store_true", default=True)
-    
+
     if testargs is None:
         args = parser.parse_args()
     else:
@@ -56,14 +56,14 @@ def cmd_arguments(debug=False, testargs=None):
 
     if args.tokenizer == "":
         args.tokenizer = args.modelname
-    
+
     args.diffsearchindex_output_tokens += args.output_tokens
-    
+
     if args.debug or debug:
-        args.samples = 6
+        args.samples = 20
         args.batchsize = 2
         args.input_tokens=8
-        args.output_tokens=8
+        args.output_tokens=16
         args.epochs=1
         # args.wandb_mode = "disabled"
     args.contextlength = args.input_tokens * 4
