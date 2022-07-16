@@ -12,7 +12,7 @@ import citation_normalization
 
 
 class SaveModelCallback(tf.keras.callbacks.Callback):
-    def __init__(self, model, tokenizer, args, len_train_dataset, training_step=0):
+    def __init__(self, model, tokenizer, args, len_train_dataset,training_step=0):
         self.model = model
         self.tokenizer = tokenizer
         self.training_step = training_step
@@ -24,7 +24,7 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
             self.log_interval = max(1, self.log_interval)
         else:
             # schedule logging 5 times per epoch
-            self.log_interval = (len_train_dataset / args.batchsize) // 5
+            self.log_interval = (len_train_dataset / args.batchsize) // 3
 
         self.save_path = "../model_save/" + args.modelname + "_" + str(wandb.run.id) + "/"
         self.save_path += "debug/" if args.debug else ""
@@ -41,13 +41,12 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
                 steps_text = self.args.modelname.split("_step_")[-1]
                 self.training_step = int(re.search(r'\d+', steps_text).group())
 
-
     def on_epoch_end(self, epoch, logs=None):
         self.save_model(epoch)
         self.epochcounter += 1
 
     def on_train_batch_end(self, batch, logs=None):
-        if self.training_step % self.log_interval == 0 and self.prefix != "train_":
+        if self.training_step % self.log_interval == 0:
             self.save_model(self.epochcounter)
 
         self.training_step += 1
