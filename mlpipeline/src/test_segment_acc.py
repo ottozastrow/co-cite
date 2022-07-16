@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from citation_normalization import normalize_citations
+from citation_normalization import normalize_citations, normalize_statute, sections_from_statute
 from train_helpers import citation_segment_acc
 
 
@@ -57,6 +57,8 @@ def get_examples():
 
 def reevaluate_table():
     preds_table_file = "../../data/test_demo_3_8a66f2801063e5ea77bc.table.json"
+    preds_table_file = "../../data/test_demo_1_1bbfb8dd530d4b94b822.table.json"
+    preds_table_file = "../../data/test_demo_1_1bbfb8dd530d4b94b822.table.json"
 
     # read file to dict
     with open(preds_table_file, "r") as f:
@@ -67,7 +69,7 @@ def reevaluate_table():
     # apply new segment acc
     # because citation_segment_acc assumes batches we add [] around each row
     df["new_segment_acc"] = df.apply(
-        lambda row: citation_segment_acc([row["top1 prediction"]], [row["label"]]),
+        lambda row: citation_segment_acc([row["top1 prediction"]], [row["label"]], False, True),
         axis=1,
     )
     df["segment_label"] = df.apply(
@@ -95,8 +97,8 @@ def reevaluate_table():
     # show 10 examples for certain columns
     # drop columns
     df = df.drop(columns=["all_topk_predictions", "scores", "inputs"])
-
-    # drop rows if 
+    
+    # keep only rows with bad segment acc
     df = df[df["avg_newsegacc"] == 0]
     print(df.head())
 
@@ -110,3 +112,6 @@ reevaluate_table()
 # from train_helpers import book_from_statute
 # print(book_from_statute("38 C.F.R. 3.321(b)(1)"))
 # print(split_citation_segments("38 C.F.R. 3.321(b)(1)"))
+inputs = "38 CFR 3.156a"
+# print(normalize_citations(inputs, remove_subsections=False, remove_subsubsections=True))
+print(citation_segment_acc(["38 U.S.C.A. § 1318"],["38 U.S.C.A. § 5314"], False, True))

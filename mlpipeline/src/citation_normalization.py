@@ -131,6 +131,7 @@ def normalize_case(inputs_orig):
             details = details.replace("-", "")
             details = details.replace(".", "")
             details = details.replace(",", "")
+            details = details.replace("at", "")
 
             inputs = participants + " " + category + " " + details
             break
@@ -173,7 +174,7 @@ def remove_useless_prefix(inputs) -> str:
     regex pattern for if "see" or "eg" "in" is at beginning of string
     has to work for "See, " "e.g. ", "See in ", ...
     """
-    useless_prefix = re.compile(r"((see|e\.g\.|in)\.?\,? )+")
+    useless_prefix = re.compile(r"((see|e\.g\.|in|compare)\.?\,? )+")
 
     useless_prefix_span = useless_prefix.search(inputs.lower())
     if useless_prefix_span:
@@ -212,7 +213,8 @@ def normalize_citations(
         is_case = "§" not in x\
             and "c.f.r" not in x\
             and "u.s.c.a" not in x\
-            and "u.s.c." not in x
+            and "u.s.c." not in x\
+            and "cfr" not in x
         if segmentize:
             if not is_case:
                 return normalize_and_segmentize_statute(

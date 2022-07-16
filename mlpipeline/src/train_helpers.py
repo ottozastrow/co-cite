@@ -312,12 +312,14 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
         # change dim ordering of list of lists
         beams_reorderd = [list(i) for i in zip(*beams)]
-
+        
         metric_outputs.append(metric_output)
         rows = [list(t) for t in zip(
                     decoded_inputs, beams[0], decoded_labels,
-                    scores, segment_acc, beams_reorderd
+                    scores, np.mean(segment_acc), beams_reorderd
                 )]
+        import pdb
+        pdb.set_trace()
         samples_table += rows
     columns = ["inputs", "top1 prediction", "label",
                "scores", "segment_acc", "all_topk_predictions"]
