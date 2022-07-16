@@ -3,28 +3,25 @@ different:
   - beamsearch
   - slow_greedysearch
   - sampling
-  - fast_predict_greedysearch
   topk:
   - 3
   - 1
   - 3
-  - 1 
 different_flags:
   sample_decoding:
   - false
   - false
   - true
-  - false
   fast_predict:
   - false
   - false
   - false
-  - true
 memory: 22800
 minutes: 1000
 same:
+  batchsize: 32
   modelname: "../model_save/../model_save/scotus_opinions/scotus opinions bart/_2nghuohb/epoch_0_steps_24266"
-  tags: 'latency_test_v9'
+  tags: 'latency_test_v10'
   samples: '1000'
 same_flags:
   - notraining
