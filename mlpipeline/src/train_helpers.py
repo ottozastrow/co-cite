@@ -362,10 +362,8 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     except:
         print("WARNING: exception in plot precision recall")
-    
-    # wandb_table to df
-    table = pd.DataFrame(samples_table, columns=columns)
 
+    table = pd.DataFrame(samples_table, columns=columns)
     plot = plot_accs_per_occurrence(table, args)
     wandb.log({prefix + "acc_per_occurrence": plot})
 
@@ -413,9 +411,8 @@ def plot_accs_per_occurrence(df, args):
     # convert df to list
     df_list = df.to_dict("records")
     # split list into 10 buckets
-    num_buckets = 10
-    if args.debug:
-        num_buckets = 2
+    num_buckets = 40
+    num_buckets = min(num_buckets, len(df_list))
     df_list_split = np.array_split(df_list, num_buckets)
     # compute average of segment_acc over 10 buckets of label_occurrences
     avg_segment_acc_per_quantile = {}
