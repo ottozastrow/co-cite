@@ -7,6 +7,8 @@ import numpy as np
 import tensorflow as tf
 import tqdm
 import wandb
+import pandas as pd
+
 
 import citation_normalization
 
@@ -306,6 +308,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
         all_scores += scores
         mean_segment_accs = []
+        # iterate over elements in batchs
         for i in range(len(decoded_labels)):
             segment_accs_no_subsections.extend(
                 citation_segment_acc(
@@ -341,6 +344,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     wandb_table = wandb.Table(columns=columns, data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
+
     # log avg decoding latency to wandb
     wandb.log({prefix + "eval_batch_decoding_latency": np.mean(decoding_latencies)})
 
@@ -358,6 +362,13 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     except:
         print("WARNING: exception in plot precision recall")
+    
+    # wandb_table to df
+    table = pd.DataFrame(samples_table, columns=columns)
+
+    plot = plot_accs_per_occurrence(table, args)
+    wandb.log({prefix + "acc_per_occurrence": plot})
+
     return results
 
 
@@ -392,6 +403,36 @@ def plot_precision_recall(matches, scores, top_ks, buckets=40):
     plt.ylabel('Precision')
     plt.title('Precision-Recall Curve')
 
+    return plt
+
+
+def plot_accs_per_occurrence(df, args):
+    df = df.sort_values(by="label_occurrences", ascending=False)
+    # show average of new_segment_acc per quantile occurences
+    # compute average of segment_acc over 10 buckets of label_occurrences
+    # convert df to list
+    df_list = df.to_dict("records")
+    # split list into 10 buckets
+    num_buckets = 10
+    if args.debug:
+        num_buckets = 2
+    df_list_split = np.array_split(df_list, num_buckets)
+    # compute average of segment_acc over 10 buckets of label_occurrences
+    avg_segment_acc_per_quantile = {}
+    for i, df_list_i in enumerate(df_list_split):
+        index = str(
+            str(df_list_i[0]["label_occurrences"]) + "-" +\
+            str(df_list_i[-1]["label_occurrences"])
+        )
+        # compute average of segment_acc over 10 buckets of label_occurrences
+        avg_segment_acc_per_quantile[index] = np.array(
+                [row["segment_acc"] for row in df_list_i]
+        ).mean()
+        
+    print(f"avg_segment_acc_per_quantile: {avg_segment_acc_per_quantile}")
+
+    # plot bar chart
+    plt.bar(list(avg_segment_acc_per_quantile.keys()), list(avg_segment_acc_per_quantile.values()))
     return plt
 
 
