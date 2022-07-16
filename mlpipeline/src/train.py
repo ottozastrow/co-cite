@@ -1,22 +1,15 @@
-from cProfile import run
-from config import cmd_arguments
 
-from prometheus_client import MetricsHandler
-import numpy as np
+from codecarbon import EmissionsTracker
+from transformers import DataCollatorForSeq2Seq, \
+    TFAutoModelForSeq2SeqLM, AdamWeightDecay
+import wandb
 from wandb.keras import WandbCallback
-
-# from transformers.keras_callbacks import KerasMetricCallback
-from transformers import DataCollatorForSeq2Seq, TFAutoModelForSeq2SeqLM, AdamWeightDecay
-from transformers.keras_callbacks import PushToHubCallback
 
 import cocitedata
 import train_helpers
 import keras_metric_callback
+from config import cmd_arguments
 from train_helpers import CustomMetrics, SaveModelCallback, tokens_2_words
-
-import wandb
-from codecarbon import EmissionsTracker
-import re
 
 
 def main():

@@ -2,14 +2,16 @@
 import os
 import shutil
 
+import datasets
 import pandas as pd
 import tqdm
-import datasets
+from datasets import disable_caching
 from transformers import AutoTokenizer
 
 from citation_normalization import normalize_citations
 import parse_retrieval_data
 
+disable_caching()
 
 def add_retrieval_data(data, retrieval_kb, args):
     # convert pandas dataframe data to list of dictionaries
