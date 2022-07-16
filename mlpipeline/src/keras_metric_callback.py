@@ -57,7 +57,10 @@ class KerasMetricCallback(Callback):
             self.log_interval = (len_train_dataset / batch_size) // 2 
             self.log_interval = max(1, self.log_interval)
         else:
-            self.log_interval = (len_train_dataset / batch_size) // 5
+            if args.evaluations_per_epoch == 0:
+                self.log_interval = -1 
+            else:
+                self.log_interval = (len_train_dataset / batch_size) // args.evaluations_per_epoch
         print("log interval", self.log_interval, "train size", len_train_dataset, "batch size", batch_size)
 
         self.output_cols = output_cols
@@ -146,7 +149,8 @@ class KerasMetricCallback(Callback):
             tokenizer=self.tokenizer)
 
     def on_train_batch_end(self, batch, logs=None):
-        if self.step_num % self.log_interval == 0 and self.prefix != "train_":
-            self.on_epoch_end(0, logs=logs)
-        self.step_num += 1
+        if not self.args.evaluations_per_epoch == 0:
+            if self.step_num % self.log_interval == 0 and self.prefix != "train_":
+                self.on_epoch_end(0, logs=logs)
+            self.step_num += 1
 
