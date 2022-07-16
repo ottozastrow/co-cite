@@ -91,6 +91,28 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
     print("total samples", total_samples)
 
 
+def add_occurance_counts(args, tmp_dir_name):
+    print("adding occurance counts to data")
+    print("reading parquet files into df")
+    filepaths = [os.path.join(tmp_dir_name, f) for f in os.listdir(tmp_dir_name)
+                 if f.endswith('.parquet')]
+
+    counts = pd.Series(dtype=int)
+    for path in tqdm.tqdm(filepaths):
+        df = pd.read_parquet(path)
+        
+        counts = counts.add(df['label'].value_counts(), fill_value=0)
+
+    counts = counts.astype(int)
+    counts.to_csv(os.path.join(tmp_dir_name, "occurrences.csv"))
+    print("finished saving occurance counts to ", os.path.join(tmp_dir_name, "occurrences.csv"))
+    for path in tqdm.tqdm(filepaths):
+        df = pd.read_parquet(path)
+        df["label_occurences"] = df["label"].map(counts)
+        df = df.to_parquet(path, compression=None)
+    print("finished adding occurance counts to parquet files")
+
+
 def parquet_to_dataframe(parquet_dir, args):
     parquet_files = [
         os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir)
@@ -204,7 +226,7 @@ def generate_ds_if_not_cached(data_dir_name, args):
         os.makedirs(tmp_dir_name, exist_ok=True)
 
         preprocess_json_and_save_to_parquet(args, tmp_dir_name)
-
+        add_occurance_counts(args, tmp_dir_name)
         # rename folder from tmp_dir_name to data_dir_name
         # delete data_dir_name if it exists
         if os.path.exists(data_dir_name):
@@ -221,7 +243,7 @@ def generate_ds_if_not_cached(data_dir_name, args):
         print("parquet file already exists, loading parquet...")
 
 
-def dataset_filepath(args, model_name_or_path: str, dataset_type="") -> str:
+def dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
     # determine name of dataset based on args
     dataset_type = ""
     if args.add_source_data:
@@ -244,6 +266,8 @@ def load_dataset(args, model_name_or_path="unspecified"):
     data_dir_name = dataset_filepath(args, model_name_or_path)
     tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"
 
+    args.parquet_data_dir_name = data_dir_name
+
     import wandb
     wandb.config.update({
         "data_dir_name": data_dir_name,
@@ -251,6 +275,8 @@ def load_dataset(args, model_name_or_path="unspecified"):
     })
 
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+
+    tokenizer.add_tokens([" §", "§", "§ "])
 
     # if tokenized dataset exists load it
     if os.path.exists(tokenized_data_dir_name) and not args.rebuild_dataset:

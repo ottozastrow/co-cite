@@ -33,7 +33,7 @@ def main():
         tokenized_train = tokenized_train.select(list(range(2)))
         tokenized_test = tokenized_test.select(list(range(2)))
 
-    training_columns = ["attention_mask", "input_ids", "labels"]
+    training_columns = ["attention_mask", "input_ids", "labels", "label_occurrences"]
     tf_train_set = tokenized_train.to_tf_dataset(
         columns=training_columns,
         shuffle=True,
@@ -65,7 +65,7 @@ def main():
         .to_tf_dataset(
             batch_size=args.batchsize,
             drop_remainder=True,
-            columns=["input_ids", "attention_mask", "labels"],
+            columns=["input_ids", "attention_mask", "labels", "label_occurrences"],
             shuffle=False,
             collate_fn=data_collator,
         )
@@ -77,12 +77,11 @@ def main():
         .to_tf_dataset(
             batch_size=args.batchsize,
             drop_remainder=True,
-            columns=["input_ids", "attention_mask", "labels"],
+            columns=["input_ids", "attention_mask", "labels", "label_occurrences"],
             shuffle=False,
             collate_fn=data_collator,
         )
     )
-
     optimizer = AdamWeightDecay(learning_rate=2e-5, weight_decay_rate=0.01)  # TODO warning high lr
     model.compile(optimizer=optimizer)
 
@@ -112,7 +111,6 @@ def main():
         len_train_dataset = len(tokenized_train["label"]),
         top_ks=top_ks,
     )
-
     wandb_callback = WandbCallback(save_model=not args.debug)
 
     callbacks = [
@@ -145,13 +143,13 @@ def main():
     ### evaluate model
     if not args.noevaluation:
         train_helpers.evaluate(
-            model, generation_test_dataset,
+            model, tf_test_set,
             metric_fn_test, prefix="test_", args=args,
             top_ks=top_ks, tokenizer=tokenizer)
-        train_helpers.evaluate(
-            model, generation_train_dataset,
-            metric_fn_train, prefix="train_", args=args,
-            top_ks=top_ks, tokenizer=tokenizer)
+        # train_helpers.evaluate(
+        #     model, generation_train_dataset,
+        #     metric_fn_train, prefix="train_", args=args,
+        #     top_ks=top_ks, tokenizer=tokenizer)
 
 if __name__ == "__main__":
     main()

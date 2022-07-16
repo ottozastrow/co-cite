@@ -233,13 +233,19 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     for k in top_ks:
         all_matches[k] = []
 
+    # load occurences dict from csv args.data_dir/occurrences.csv
+    import csv
+    with open(args.parquet_data_dir_name + "/occurrences.csv", "r") as f:
+        reader = csv.reader(f)
+        occurences_map = {rows[0]: int(rows[1]) for rows in reader}
+    print("loaded occurences. found ", len(occurences_map), " entries")
+
     decoding_latencies = []
     all_scores = []
     samples_table = []
     for batch in tqdm.tqdm(dataset):
         inputs = batch["input_ids"]
         labels = batch["labels"]
-
         # timeit
         start = time.time()
         # generate predictions
@@ -268,6 +274,14 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         predictions = modeloutdict["sequences"]
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(tokenizer, predictions, labels, inputs=inputs)
+
+        occurrences = []
+        for label in decoded_labels:
+            if label in occurences_map.keys():
+                occurrences.append(occurences_map[label])
+            else:
+                print("didn't find label in occurences_map: ", label)
+                occurrences.append(None)
 
         if args.topk != 1:
             beams = rearrange_model_generate(decoded_predictions, args)
@@ -317,11 +331,11 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         mean_segment_acc = [np.mean(sample) for sample in segment_acc]
         metric_outputs.append(metric_output)
         rows = [list(t) for t in zip(
-                    decoded_inputs, beams[0], decoded_labels,
+                    decoded_inputs, beams[0], decoded_labels, occurrences,
                     scores, mean_segment_acc, beams_reorderd
                 )]
         samples_table += rows
-    columns = ["inputs", "top1 prediction", "label",
+    columns = ["inputs", "top1 prediction", "label", "label_occurrences",
                "scores", "segment_acc", "all_topk_predictions"]
     wandb_table = wandb.Table(columns=columns, data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
