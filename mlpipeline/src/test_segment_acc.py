@@ -107,11 +107,11 @@ def reevaluate_table():
     # launch file in browser from terminal
     # open -a /Applications/Google\ Chrome.app ../../data/test_demo_3_8a66f2801063e5ea77bc.table.html
 
-reevaluate_table()
+# reevaluate_table()
 
 # from train_helpers import book_from_statute
 # print(book_from_statute("38 C.F.R. 3.321(b)(1)"))
 # print(split_citation_segments("38 C.F.R. 3.321(b)(1)"))
 inputs = "38 CFR 3.156a"
 # print(normalize_citations(inputs, remove_subsections=False, remove_subsubsections=True))
-print(citation_segment_acc(["38 U.S.C.A. § 1318"],["38 U.S.C.A. § 5314"], False, True))
+print(citation_segment_acc("38 C.F.R. § 3.57","38 C.F.R. §§ 3.57, 3.315, 3.356", False, True))

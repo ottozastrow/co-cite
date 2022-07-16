@@ -146,10 +146,10 @@ def main():
             model, tf_test_set,
             metric_fn_test, prefix="test_", args=args,
             top_ks=top_ks, tokenizer=tokenizer)
-        # train_helpers.evaluate(
-        #     model, generation_train_dataset,
-        #     metric_fn_train, prefix="train_", args=args,
-        #     top_ks=top_ks, tokenizer=tokenizer)
+        train_helpers.evaluate(
+            model, generation_train_dataset,
+            metric_fn_train, prefix="train_", args=args,
+            top_ks=top_ks, tokenizer=tokenizer)
 
 if __name__ == "__main__":
     main()

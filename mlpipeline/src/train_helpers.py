@@ -73,10 +73,10 @@ def normalize(x):
 
 
 def citation_segment_acc(
-        predictions, labels,
+        prediction, label,
         remove_subsections, remove_subsubsections, args=None) -> list[bool]:
     """
-    assumes batched inputs
+    assumes unbatched inputs
 
     converts from list of strings of this kind
     38 U.S.C.A. §§ 5100, 5102, 5103, 5103A, 5106, 5107
@@ -87,35 +87,34 @@ def citation_segment_acc(
 
     """
     accs = []
-    for i in range(len(labels)):
-        x = predictions[i]
-        y = labels[i]
-        if args:
-            if args.diffsearchindex_training:
-                x = x.split("[SEP]")[0]
-                y = y.split("[SEP]")[0]
-        x = citation_normalization.normalize_citations(
-            x,
-            remove_subsections=remove_subsections,
-            remove_subsubsections=remove_subsubsections,
-            segmentize=True)
-        y = citation_normalization.normalize_citations(
-            y,
-            remove_subsections=remove_subsections,
-            remove_subsubsections=remove_subsubsections,
-            segmentize=True)
-        # compute accuracy
-        # builds on assumption that x and y don't contain duplicates.
-        # in the BVA corpus, this is true.
-        # for every el in y, check if x has el
-        contained = [el in x for el in y]
-        contained = []
-        for yi in y:
-            contains = []
-            for xi in x:
-                contains.append(yi in xi)
-            contained.append(any(contains))
-        accs.extend(contained)
+    x = prediction
+    y = label
+    if args:
+        if args.diffsearchindex_training:
+            x = x.split("[SEP]")[0]
+            y = y.split("[SEP]")[0]
+    x = citation_normalization.normalize_citations(
+        x,
+        remove_subsections=remove_subsections,
+        remove_subsubsections=remove_subsubsections,
+        segmentize=True)
+    y = citation_normalization.normalize_citations(
+        y,
+        remove_subsections=remove_subsections,
+        remove_subsubsections=remove_subsubsections,
+        segmentize=True)
+    # compute accuracy
+    # builds on assumption that x and y don't contain duplicates.
+    # in the BVA corpus, this is true.
+    # for every el in y, check if x has el
+    contained = [el in x for el in y]
+    contained = []
+    for yi in y:
+        contains = []
+        for xi in x:
+            contains.append(yi in xi)
+        contained.append(any(contains))
+    accs.extend(contained)
     return accs
 
 
@@ -306,33 +305,35 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             all_matches[k].extend(matches[k])
 
         all_scores += scores
-        segment_accs_no_subsections.extend(
-            citation_segment_acc(
-                beams[0], decoded_labels,
-                remove_subsections=True, remove_subsubsections=True,
-                args=args,
-            )
-        )
-        segment_accs_with_subsubsections.extend(
-            citation_segment_acc(
-                beams[0], decoded_labels,
-                remove_subsections=False, remove_subsubsections=False,
-                args=args,
+        mean_segment_accs = []
+        for i in range(len(decoded_labels)):
+            segment_accs_no_subsections.extend(
+                citation_segment_acc(
+                    beams[0][i], decoded_labels[i],
+                    remove_subsections=True, remove_subsubsections=True,
+                    args=args,
                 )
             )
+            segment_accs_with_subsubsections.extend(
+                citation_segment_acc(
+                    beams[0][i], decoded_labels[i],
+                    remove_subsections=False, remove_subsubsections=False,
+                    args=args,
+                    )
+                )
 
-        segment_acc = citation_segment_acc(
-            beams[0], decoded_labels, args=args,
-            remove_subsections=False, remove_subsubsections=True)
-        segment_accs.extend(segment_acc)
+            segment_acc = citation_segment_acc(
+                beams[0][i], decoded_labels[i], args=args,
+                remove_subsections=False, remove_subsubsections=True)
+            segment_accs.extend(segment_acc)
+            mean_segment_accs.append(np.mean(segment_acc))
 
         # change dim ordering of list of lists
         beams_reorderd = [list(i) for i in zip(*beams)]
-        mean_segment_acc = [np.mean(sample) for sample in segment_acc]
         metric_outputs.append(metric_output)
         rows = [list(t) for t in zip(
                     decoded_inputs, beams[0], decoded_labels, occurrences,
-                    scores, mean_segment_acc, beams_reorderd
+                    scores, mean_segment_accs, beams_reorderd
                 )]
         samples_table += rows
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
