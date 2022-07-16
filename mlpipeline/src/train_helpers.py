@@ -155,9 +155,8 @@ class CustomMetrics():
         # correctness of batchsize x beam_index
         top_ks = [1, 3, 5, 20]
         max_k = max(top_ks)
-        max_k = min(max_k, len(beams)) 
+        max_k = min(max_k, len(beams))
         top_ks = [k for k in top_ks if k <= max_k]
-
 
         match_at_k = np.zeros((len(beams), len(labels)))
         matches = {}
@@ -167,8 +166,8 @@ class CustomMetrics():
             beam = beams[i]
             for j in range(len(labels)):  # iterate through batch
 
-                x = normalize(beam[j])
-                y = normalize(labels[j])
+                x = citation_normalization.normalize_citations(beam[j])
+                y = citation_normalization.normalize_citations(labels[j])
                 exact_match = x == y
                 match_at_k[i, j] = exact_match
 
