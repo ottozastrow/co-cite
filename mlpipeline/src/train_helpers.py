@@ -269,8 +269,8 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
         if args.topk != 1:
             beams = rearrange_model_generate(decoded_predictions, args)
-            scores = list(scores.numpy())
-            scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
+            #scores = list(scores.numpy())
+            #scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
         else:
             # when args.topk == 1, predictions is a tuple of logits (tensor)
             # of shape seqlen x batchsize x vocabsize
@@ -283,44 +283,45 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
             beams = [decoded_predictions]
 
-        metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
+        # metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
 
-        # add matches dict to all matches
-        for k in list(matches.keys()):
-            all_matches[k].extend(matches[k])
+        # # add matches dict to all matches
+        # for k in list(matches.keys()):
+        #     all_matches[k].extend(matches[k])
 
-        all_scores += scores
-        segment_accs_no_subsections.extend(
-            citation_segment_acc(
-                beams[0], decoded_labels,
-                remove_subsections=True, remove_subsubsections=True,
-                args=args,
-            )
-        )
-        segment_accs_with_subsubsections.extend(
-            citation_segment_acc(
-                beams[0], decoded_labels,
-                remove_subsections=False, remove_subsubsections=False,
-                args=args,
-                )
-            )
+        # all_scores += scores
+        # segment_accs_no_subsections.extend(
+        #     citation_segment_acc(
+        #         beams[0], decoded_labels,
+        #         remove_subsections=True, remove_subsubsections=True,
+        #         args=args,
+        #     )
+        # )
+        # segment_accs_with_subsubsections.extend(
+        #     citation_segment_acc(
+        #         beams[0], decoded_labels,
+        #         remove_subsections=False, remove_subsubsections=False,
+        #         args=args,
+        #         )
+        #     )
 
-        segment_acc = citation_segment_acc(
-            beams[0], decoded_labels, args=args,
-            remove_subsections=False, remove_subsubsections=True)
-        segment_accs.extend(segment_acc)
+        # segment_acc = citation_segment_acc(
+        #     beams[0], decoded_labels, args=args,
+        #     remove_subsections=False, remove_subsubsections=True)
+        # segment_accs.extend(segment_acc)
 
-        # change dim ordering of list of lists
-        beams_reorderd = [list(i) for i in zip(*beams)]
+        # # change dim ordering of list of lists
+        # beams_reorderd = [list(i) for i in zip(*beams)]
 
-        metric_outputs.append(metric_output)
+        # metric_outputs.append(metric_output)
         rows = [list(t) for t in zip(
                     decoded_inputs, beams[0], decoded_labels,
-                    scores, segment_acc, beams_reorderd
+                    #scores, segment_acc, beams_reorderd
                 )]
         samples_table += rows
     columns = ["inputs", "top1 prediction", "label",
-               "scores", "segment_acc", "all_topk_predictions"]
+               #"scores", "segment_acc", "all_topk_predictions"
+               ]
     wandb_table = wandb.Table(columns=columns, data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
