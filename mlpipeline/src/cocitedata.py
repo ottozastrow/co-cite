@@ -1,5 +1,7 @@
 # imports
 import os
+import shutil
+
 import pandas as pd
 import tqdm
 import datasets
@@ -196,7 +198,7 @@ def generate_ds_if_not_cached(data_dir_name, args):
         tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
         # delete tmp dir if it exists
         if os.path.exists(tmp_dir_name):
-            os.system("rm -r " + tmp_dir_name)
+            shutil.rmtree(data_dir_name, ignore_errors=True)
         os.makedirs(tmp_dir_name, exist_ok=True)
 
         preprocess_json_and_save_to_parquet(args, tmp_dir_name)
@@ -204,10 +206,13 @@ def generate_ds_if_not_cached(data_dir_name, args):
         # rename folder from tmp_dir_name to data_dir_name
         # delete data_dir_name if it exists
         if os.path.exists(data_dir_name):
-            os.system("rm -r " + data_dir_name)
+            # delete folder and content with shutil
+            shutil.rmtree(data_dir_name, ignore_errors=True)
+
 
         # only overwrite old dataset if creation of new one didn't crash until here.
-        os.rename(tmp_dir_name, data_dir_name)
+        shutil.move(tmp_dir_name, data_dir_name)
+
         print("saved df to parquet", data_dir_name)
 
     else:
