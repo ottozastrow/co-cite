@@ -37,8 +37,8 @@ def remove_last_numeric_brackets(x):
 
 def sections_from_statute(
         statute_orig,
+        remove_subsections,
         remove_subsubsections,
-        remove_subsections=True
         ) -> list[str]:
     """
     returns the book from a statute
@@ -138,28 +138,30 @@ def normalize_case(inputs_orig):
     return inputs
 
 
-def normalize_and_segmentize_statute(inputs) -> list[str]:
+def normalize_and_segmentize_statute(
+        inputs, remove_subsections, remove_subsubsections) -> list[str]:
     inputs = remove_useless_prefix(inputs)
 
     book = book_from_statute(inputs)
 
     sections = sections_from_statute(
         inputs,
-        remove_subsubsections=True,
-        remove_subsections=False)
+        remove_subsubsections=remove_subsubsections,
+        remove_subsections=remove_subsections)
     segments = [book + " § " + section for section in sections]
     return segments
 
 
-def normalize_statute(inputs) -> str:
+def normalize_statute(
+        inputs, remove_subsections, remove_subsubsections) -> str:
     """ does not split into segments"""
     inputs = remove_useless_prefix(inputs)
     book = book_from_statute(inputs)
 
     sections = sections_from_statute(
         inputs,
-        remove_subsubsections=True,
-        remove_subsections=False)
+        remove_subsubsections=remove_subsubsections,
+        remove_subsections=remove_subsections)
     txt = book + " §§ " + ", ".join(sections)
     return txt
 
@@ -179,10 +181,11 @@ def remove_useless_prefix(inputs) -> str:
 
 
 def normalize_citations(
-        inputs,
-        segmentize=False,
-        remove_subsubsections=True,
-        remove_subsections=False):
+            inputs,
+            segmentize=False,
+            remove_subsections=False,
+            remove_subsubsections=True,
+        ):
     """
     splits a citation into segments
     38 U.S.C.A. §§ 5100A, 5102(a)(1) becomes
@@ -210,13 +213,15 @@ def normalize_citations(
             and "u.s.c." not in x
         if segmentize:
             if not is_case:
-                return normalize_and_segmentize_statute(inputs)
+                return normalize_and_segmentize_statute(
+                    inputs, remove_subsections, remove_subsubsections)
             else:
                 inputs = normalize_case(inputs)
                 return [inputs]
         else:
             if not is_case:
-                return normalize_statute(inputs)
+                return normalize_statute(
+                    inputs, remove_subsections, remove_subsubsections)
             else:
                 return normalize_case(inputs)
 
