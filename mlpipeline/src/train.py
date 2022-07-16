@@ -50,7 +50,7 @@ def main():
 
     # valid number between 100 and 5000
     ds_len = len(tokenized_test["label"])
-    num_demo_samples = max(100, ds_len // 10)
+    num_demo_samples = max(100, ds_len // 20)
     num_demo_samples = min(10000, num_demo_samples)
 
     if num_demo_samples > ds_len:
@@ -60,7 +60,7 @@ def main():
 
     generation_test_dataset = (
         tokenized_test
-        .shuffle()
+        .shuffle(seed=42)
         .select(list(range(num_demo_samples)))
         .to_tf_dataset(
             batch_size=args.batchsize,
@@ -72,7 +72,7 @@ def main():
     )
     generation_train_dataset = (
         tokenized_train
-        .shuffle()
+        .shuffle(seed=42)
         .select(list(range(num_demo_samples)))
         .to_tf_dataset(
             batch_size=args.batchsize,
