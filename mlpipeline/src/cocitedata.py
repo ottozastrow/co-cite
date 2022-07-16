@@ -5,6 +5,7 @@ import tqdm
 import datasets
 from transformers import AutoTokenizer
 
+from citation_normalization import normalize_citations
 import parse_retrieval_data
 
 
@@ -17,7 +18,7 @@ def add_retrieval_data(data, retrieval_kb, args):
         data_list = [el for el in data_list if el["found_source"]]
     if args.diffsearchindex_training:
         data_list = [add_diffsearchindex_label(el, args) for el in data_list]
-    
+
     # convert list of dictionaries to pandas dataframe
     data = pd.DataFrame(data_list)
     return data
@@ -39,21 +40,25 @@ def add_diffsearchindex_label(sample, args):
 def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
     """json data is the format provided by the BVA dataset.
     This function converts it to parquet format.
-    
+
     beforer converting to parquet the data is processed
     we transform from one row per document to one row per citation."""
 
     print("reading json files into df")
-    filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir) if f.endswith('.json')]
+    filepaths = [os.path.join(args.data_dir, f) for f in os.listdir(args.data_dir)
+                 if f.endswith('.json')]
     if args.samples != -1:
         filepaths = filepaths[:args.samples]
 
     # create batches of files
-    filebatchsize=100
-    batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
+    filebatchsize = 100
+    batches = [filepaths[i:i+filebatchsize]
+               for i in range(0, len(filepaths), filebatchsize)]
 
-    # iterate over batches. each batch is stored locally in its own parquet file.
-    dropped_sum = 0  # when adding source data, we drop citations that don't have a source
+    # iterate over batches. each batch is
+    # stored locally in its own parquet file.
+    dropped_sum = 0  # when adding source data,
+    # we drop citations that don't have a source
     total_samples = 0  # for comparison with dropped_sum
     if args.add_source_data:
         knowledge_kb = parse_retrieval_data.load_sources_kb(args)
@@ -61,7 +66,8 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
     for i in tqdm.tqdm(range(len(batches))):
         df_chunks = []
         for file in batches[i]:
-            data = pd.read_json(file, lines=True) # read data frame from json file
+            # read data frame from json file
+            data = pd.read_json(file, lines=True)
             data = preprocess_data(data, args)  # expensive operation
             if args.add_source_data:
                 retrieval_data = add_retrieval_data(data, knowledge_kb, args)
@@ -71,7 +77,7 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
                 df_chunks.append(retrieval_data)
             else:
                 df_chunks.append(data)
-                
+
         df = pd.concat(df_chunks, copy=False, ignore_index=True)
         batch_fp = tmp_dir_name + "batch_" + str(i) + ".parquet"
         print("finished converting batch nr. ", str(i), "to df")
@@ -92,8 +98,12 @@ def parquet_to_dataframe(parquet_dir, args):
 
 
 def parquet_to_dataset(parquet_dir, args):
-    parquet_files = [os.path.join(parquet_dir, f) for f in os.listdir(parquet_dir) if f.endswith('.parquet')]
-    df = datasets.load_dataset("parquet", data_files=parquet_files, cache_dir="../huggingface_cache/datasets/")
+    parquet_files = [os.path.join(parquet_dir, f)
+                     for f in os.listdir(parquet_dir)
+                     if f.endswith('.parquet')]
+    df = datasets.load_dataset(
+        "parquet", data_files=parquet_files,
+        cache_dir="../huggingface_cache/datasets/")
     df = df['train']  # load_datasets makes this necessary
     return df
 
@@ -108,7 +118,7 @@ def find_all_indexes(txt, substr):
             break
         indexes.append(i)
     return indexes
-    
+
 
 def get_citation_context(x, args):
     """Extract inputs and targets from a dataframe row"""
@@ -116,7 +126,7 @@ def get_citation_context(x, args):
     targets = []
     contextlength = args.contextlength
     indexes = find_all_indexes(x['txt'], "@cit@")  # TODO replace compuationally iniefficient method
-    
+
     for i in range(len(x['citation_vocab'])):
         # variant_index, _ = max(enumerate(x['citation_vocab'][i]), key=lambda x: len(x[1]))
         # variant_index = 0  # TODO understand why there are several indices and replace this line
@@ -127,6 +137,7 @@ def get_citation_context(x, args):
             stop_index = index  # TODO: also look at text after citation
             context = x['txt'][start_index:stop_index]
             citation = x['citation_texts'][i]
+            citation = normalize_citations(citation, segmentize=False)
             inputs.append(context)
             targets.append(citation)
         except:
@@ -147,7 +158,7 @@ def preprocess_data(df, args):
     columns = {'text' : inputs_series,
                'label' : targets_series}
     df_pairs = pd.DataFrame(columns)
-    
+
     return df_pairs
 
 
@@ -178,6 +189,7 @@ def create_tokenize_function(tokenizer, args):
             return model_inputs
     return tokenize_function
 
+
 def generate_ds_if_not_cached(data_dir_name, args):
     # create parquet files from raw data if not already done
     if not os.path.exists(data_dir_name) or args.rebuild_dataset:
@@ -186,14 +198,14 @@ def generate_ds_if_not_cached(data_dir_name, args):
         if os.path.exists(tmp_dir_name):
             os.system("rm -r " + tmp_dir_name)
         os.makedirs(tmp_dir_name, exist_ok=True)
-        
+
         preprocess_json_and_save_to_parquet(args, tmp_dir_name)
 
         # rename folder from tmp_dir_name to data_dir_name
         # delete data_dir_name if it exists
         if os.path.exists(data_dir_name):
             os.system("rm -r " + data_dir_name)
-        
+
         # only overwrite old dataset if creation of new one didn't crash until here.
         os.rename(tmp_dir_name, data_dir_name)
         print("saved df to parquet", data_dir_name)
@@ -202,15 +214,15 @@ def generate_ds_if_not_cached(data_dir_name, args):
         print("parquet file already exists, loading parquet...")
 
 
-def dataset_filepath(args, model_name_or_path:str, dataset_type="") -> str:
+def dataset_filepath(args, model_name_or_path: str, dataset_type="") -> str:
     # determine name of dataset based on args
     dataset_type = ""
     if args.add_source_data:
         dataset_type += "haystack_DPR/"
     if args.diffsearchindex_training:
         dataset_type += "diffsearchindex_training/"
-    
-    length_str = "all" 
+
+    length_str = "all"
     if args.samples != -1:
         length_str = str(args.samples)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
@@ -251,5 +263,5 @@ def load_dataset(args, model_name_or_path="unspecified"):
             batched=True
         )
         tokenized_datasets.save_to_disk(tokenized_data_dir_name)
-    
+
     return tokenized_datasets, tokenizer

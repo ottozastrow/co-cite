@@ -36,6 +36,7 @@ def test_plot_precision_recall():
     plot_precision_recall(preds, scores, targets, top_ks=[1, 3, 5])
     assert True
 
+
 def test_segment_metric():
     args = None
     accs = citation_segment_acc(labels, labels, args)
@@ -56,10 +57,9 @@ def test_acc_metric():
         inputs = batch["input_ids"]
         labels = batch["labels"]
 
-
         fn = CustomMetrics(prefix="test_", args=args).fast_metrics
         to_tupledict = lambda x, y: ({"sequences":x}, y)
-        
+
         metrics, matches_at_k = fn(to_tupledict(labels, labels))
         for key in metrics.keys():
             assert metrics[key] == 1.0
@@ -71,9 +71,10 @@ def test_acc_metric():
 
         break
 
+
 def test_batch_means_nested():
     inputs = [{"acc": 0.5, "loss": [0.5, 8]},
-            {"acc": 0.6, "loss": [0.6, 9]},]
+              {"acc": 0.6, "loss": [0.6, 9]},]
     res = train_helpers.mean_over_metrics_batches(inputs)
     assert res["acc"] == 0.55
     assert res["loss"] == 4.525
