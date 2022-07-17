@@ -63,7 +63,7 @@ def main():
         .shuffle(seed=42)
         .select(list(range(num_demo_samples)))
         .to_tf_dataset(
-            batch_size=args.batchsize,
+            batch_size=1,
             drop_remainder=True,
             columns=["input_ids", "attention_mask", "labels", "label_occurrences"],
             shuffle=False,
@@ -75,7 +75,7 @@ def main():
         .shuffle(seed=42)
         .select(list(range(num_demo_samples)))
         .to_tf_dataset(
-            batch_size=args.batchsize,
+            batch_size=1,
             drop_remainder=True,
             columns=["input_ids", "attention_mask", "labels", "label_occurrences"],
             shuffle=False,
