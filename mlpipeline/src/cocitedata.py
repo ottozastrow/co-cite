@@ -276,8 +276,7 @@ def load_dataset(args, model_name_or_path="unspecified"):
 
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
 
-    tokenizer.add_tokens([" §", "§", "§ "])
-
+    tokenizer.add_tokens([" §", "§"])
     # if tokenized dataset exists load it
     if os.path.exists(tokenized_data_dir_name) and not args.rebuild_dataset:
         print("loading tokenized dataset from", tokenized_data_dir_name)

@@ -24,14 +24,14 @@ def main():
     model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=args.from_pytorch)
     tokenized_datasets, tokenizer = cocitedata.load_dataset(args, model_name_or_path=model.name_or_path)
 
-
     ### build datasets
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, return_tensors="tf")
     tokenized_train = tokenized_datasets["train"]
     tokenized_test = tokenized_datasets["test"]
-    if args.debug:
-        tokenized_train = tokenized_train.select(list(range(2)))
-        tokenized_test = tokenized_test.select(list(range(2)))
+
+    # if args.debug:
+    #     tokenized_train = tokenized_train.select(list(range(2)))
+    #     tokenized_test = tokenized_test.select(list(range(2)))
 
     training_columns = ["attention_mask", "input_ids", "labels", "label_occurrences"]
     tf_train_set = tokenized_train.to_tf_dataset(

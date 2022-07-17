@@ -3,6 +3,8 @@ import re
 import time
 
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+
 import numpy as np
 import tensorflow as tf
 import tqdm
@@ -223,14 +225,13 @@ def tokens_2_words(tokenizer, predictions, labels, inputs=None):
 def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     print("starting eval" + prefix)
     metric_outputs = []
-    all_matches = {}
     segment_accs = []  # a given target may contain several segments.
-    segment_accs_with_subsubsections = []
     segment_accs_no_subsections = []
     # here accuracy is computed for each segment
     # if top_ks isnatnce of tuple
     if isinstance(top_ks, tuple):
         top_ks = top_ks[0]  # unexplainable bug causes this
+    all_matches = {}
     for k in top_ks:
         all_matches[k] = []
 
@@ -317,13 +318,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
                     args=args,
                 )
             )
-            segment_accs_with_subsubsections.extend(
-                citation_segment_acc(
-                    beams[0][i], decoded_labels[i],
-                    remove_subsections=False, remove_subsubsections=False,
-                    args=args,
-                    )
-                )
 
             segment_acc = citation_segment_acc(
                 beams[0][i], decoded_labels[i], args=args,
@@ -334,16 +328,20 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         # change dim ordering of list of lists
         beams_reorderd = [list(i) for i in zip(*beams)]
         metric_outputs.append(metric_output)
-        rows = [list(t) for t in zip(
-                    decoded_inputs, beams[0], decoded_labels, occurrences,
-                    scores, mean_segment_accs, beams_reorderd
-                )]
+        columns_list = [
+            decoded_inputs, beams[0], decoded_labels, occurrences,
+            scores, mean_segment_accs, beams_reorderd
+        ]
+        columns_list.extend(list(matches.values()))
+        columns_list = list(columns_list)
+        rows = [list(t) for t in zip(*(columns_list))]
         samples_table += rows
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
                "scores", "segment_acc", "all_topk_predictions"]
+    topk_keys = ["top-" + str(i) for i in all_matches.keys()]
+    columns.extend(topk_keys)
     wandb_table = wandb.Table(columns=columns, data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
-
 
     # log avg decoding latency to wandb
     wandb.log({prefix + "eval_batch_decoding_latency": np.mean(decoding_latencies)})
@@ -351,7 +349,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     results = mean_over_metrics_batches(metric_outputs)
     results["segment_acc"] = np.mean(segment_accs)
     results["segment_acc_no_subsections"] = np.mean(segment_accs_no_subsections)
-    results["segment_acc_with_subsubsections"] = np.mean(segment_accs_with_subsubsections)
     print({prefix: results})
     wandb.log({prefix: results})
 
@@ -364,8 +361,9 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         print("WARNING: exception in plot precision recall")
 
     table = pd.DataFrame(samples_table, columns=columns)
-    plot = plot_accs_per_occurrence(table, args)
-    wandb.log({prefix + "acc_per_occurrence": plot})
+    # import pdb
+    # pdb.set_trace()
+    plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
 
     return results
 
@@ -404,33 +402,47 @@ def plot_precision_recall(matches, scores, top_ks, buckets=40):
     return plt
 
 
-def plot_accs_per_occurrence(df, args):
+def plot_accs_per_occurrence(df, columns):
     df = df.sort_values(by="label_occurrences", ascending=False)
     # show average of new_segment_acc per quantile occurences
     # compute average of segment_acc over 10 buckets of label_occurrences
     # convert df to list
     df_list = df.to_dict("records")
-    # split list into 10 buckets
     num_buckets = 40
     num_buckets = min(num_buckets, len(df_list))
     df_list_split = np.array_split(df_list, num_buckets)
-    # compute average of segment_acc over 10 buckets of label_occurrences
-    avg_segment_acc_per_quantile = {}
-    for i, df_list_i in enumerate(df_list_split):
-        index = str(
-            str(df_list_i[0]["label_occurrences"]) + "-" +\
-            str(df_list_i[-1]["label_occurrences"])
-        )
-        # compute average of segment_acc over 10 buckets of label_occurrences
-        avg_segment_acc_per_quantile[index] = np.array(
-                [row["segment_acc"] for row in df_list_i]
-        ).mean()
-        
-    print(f"avg_segment_acc_per_quantile: {avg_segment_acc_per_quantile}")
+    quantiles = {}
+    x_titles = []
 
-    # plot bar chart
-    plt.bar(list(avg_segment_acc_per_quantile.keys()), list(avg_segment_acc_per_quantile.values()))
-    return plt
+    for column in columns:
+        quantiles[column] = []
+        for i, df_list_i in enumerate(df_list_split):
+            index = str(df_list_i[0]["label_occurrences"]) + " - "\
+                + str(df_list_i[-1]["label_occurrences"])
+            x_titles.append(index)
+            # compute average of segment_acc over 10 buckets of label_occurrences
+            avg = np.array(
+                    [row[column] for row in df_list_i]
+            ).mean()
+            quantiles[column].append(avg)
+
+    fig = go.Figure()
+    for column in columns:
+        fig.add_bar(
+            name=column,
+            x=x_titles,
+            y=list(quantiles[column]))
+
+    # fig.update_layout(barmode='stack')
+    # fig.update_layout(barmode="relative")
+    fig.update_layout(title_text="Average Segment Accuracy per Quantile Occurrences")
+
+    # x axis = occurrence range
+    fig.update_xaxes(title_text="Occurrence Range")
+    # y axis = average segment accuracy
+    fig.update_yaxes(title_text="Average Segment Accuracy")
+    # fig.show()
+    wandb.log({"avg_segment_acc_per_quantile": fig})
 
 
 def mean_over_metrics_batches(batchwise_metrics):

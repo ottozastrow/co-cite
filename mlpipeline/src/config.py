@@ -62,10 +62,10 @@ def cmd_arguments(debug=False, testargs=None):
     args.diffsearchindex_output_tokens += args.output_tokens
 
     if args.debug or debug:
-        args.samples = 20
+        args.samples = 10
         args.batchsize = 2
         args.input_tokens=8
-        args.output_tokens=16
+        args.output_tokens=42
         args.epochs=1
         # args.wandb_mode = "disabled"
     args.contextlength = args.input_tokens * 4

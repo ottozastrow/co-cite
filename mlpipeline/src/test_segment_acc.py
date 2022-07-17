@@ -55,33 +55,23 @@ def get_examples():
 # test_segmentize_statute()
 
 
-def reevaluate_table():
+def get_table():
     preds_table_file = "../../data/test_demo_3_8a66f2801063e5ea77bc.table.json"
     preds_table_file = "../../data/test_demo_1_1bbfb8dd530d4b94b822.table.json"
     preds_table_file = "../../data/test_demo_1_1bbfb8dd530d4b94b822.table.json"
     preds_table_file = "../../data/test_demo_0_b0bdb1918bbd1d9003b8.table.json"
+    preds_table_file = "../../data/test_demo_0_8c91d7eb9cc028d5b70f.table.json"
 
     # read file to dict
     with open(preds_table_file, "r") as f:
         preds_table = json.load(f)
 
     df = pd.DataFrame(preds_table["data"], columns=preds_table["columns"])
-    print(preds_table["columns"])
     # apply new segment acc
     # because citation_segment_acc assumes batches we add [] around each row
     df["new_segment_acc"] = df.apply(
-        lambda row: citation_segment_acc([row["top1 prediction"]], [row["label"]], False, True),
+        lambda row: citation_segment_acc(row["top1 prediction"], row["label"], False, True),
         axis=1,
-    )
-    df["segment_label"] = df.apply(
-        lambda row: normalize_citations(row["label"]), axis=1
-    )
-
-    df["pred_label"] = df.apply(
-        lambda row: normalize_citations(row["top1 prediction"]), axis=1
-    )
-    df["avg_newsegacc"] = df.apply(
-        lambda row: np.mean(row["new_segment_acc"]), axis=1
     )
 
     # average of new_segment_acc
@@ -92,40 +82,11 @@ def reevaluate_table():
 
     new_segment_acc_mean = np.array(all_new_segment_accs).mean()
     print(f"new_segment_acc_mean: {new_segment_acc_mean}")
-    # average of old_segment_acc
     print(df["segment_acc"].mean())
 
-    # show 10 examples for certain columns
-    # drop columns
     df = df.drop(columns=["all_topk_predictions", "scores", "inputs"])
-    # sort by label_occurrences
-    df = df.sort_values(by="label_occurrences", ascending=False)
-    # show average of new_segment_acc per quantile occurences
-    # compute average of segment_acc over 10 buckets of label_occurrences
-    # convert df to list
-    df_list = df.to_dict("records")
-    # split list into 10 buckets
-    df_list_split = np.array_split(df_list, 10)
-    # compute average of segment_acc over 10 buckets of label_occurrences
-    avg_segment_acc_per_quantile = {}
-    for i, df_list_i in enumerate(df_list_split):
-        index = str(
-            str(df_list_i[0]["label_occurrences"]) + "-" +\
-            str(df_list_i[-1]["label_occurrences"])
-        )
-        # compute average of segment_acc over 10 buckets of label_occurrences
-        avg_segment_acc_per_quantile[index] = np.array(
-                [row["segment_acc"] for row in df_list_i]
-        ).mean()
-        
-    print(f"avg_segment_acc_per_quantile: {avg_segment_acc_per_quantile}")
     
-    import matplotlib.pyplot as plt
-    
-    # plot bar chart
-    plt.bar(list(avg_segment_acc_per_quantile.keys()), list(avg_segment_acc_per_quantile.values()))
-    plt.show()
-
+    return df
     # keep only rows with bad segment acc
     # df = df[df["avg_newsegacc"] == 0]
 
@@ -134,7 +95,7 @@ def reevaluate_table():
     # launch file in browser from terminal
     # open -a /Applications/Google\ Chrome.app ../../data/test_demo_3_8a66f2801063e5ea77bc.table.html
 
-reevaluate_table()
+# reevaluate_table()
 
 # from train_helpers import book_from_statute
 # print(book_from_statute("38 C.F.R. 3.321(b)(1)"))
@@ -142,3 +103,13 @@ reevaluate_table()
 inputs = "38 CFR 3.156a"
 # print(normalize_citations(inputs, remove_subsections=False, remove_subsubsections=True))
 # print(citation_segment_acc("38 C.F.R. § 3.57","38 C.F.R. §§ 3.57, 3.315, 3.356", False, True))
+
+def test_plot():
+    df = get_table()
+    import wandb
+    # wandb.init(project="co-cite", tags="debug")
+    from train_helpers import plot_accs_per_occurrence
+    print(df.keys())
+    plot_accs_per_occurrence(df, columns=["segment_acc", "segment_acc"])
+
+test_plot()
