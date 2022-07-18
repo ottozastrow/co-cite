@@ -50,7 +50,7 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--drop_citations_without_source",
                         help="when add_source_data is set, drop all samples where no source was found",
                         action="store_true", default=True)
-    parser.add_argument("--normalize_citations", help="normalize citations before building dataset", action="store_true")
+    parser.add_argument("--dont_normalize_citations", help="normalize citations before building dataset", action="store_true")
 
     if testargs is None:
         args = parser.parse_args()
