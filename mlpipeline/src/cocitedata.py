@@ -264,7 +264,7 @@ def dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
     data_dir_name = "../data/generated_bva_variants/" +\
         "type_" + dataset_type + "/" +\
         "modelname_" + model_name_or_path + "/" +\
-        "normalized_" if args.normalize_text else "" +\
+        "normalized_" if not args.dont_normalize_citations else "" +\
         "data_len_" + length_str + "/"
     return data_dir_name
 
