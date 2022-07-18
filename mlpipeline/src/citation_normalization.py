@@ -43,6 +43,12 @@ def sections_from_statute(
     """
     returns the book from a statute
     38 U.S.C.A. §§ 5100, 5102, 5103A,  -> [5100, 5102, 5103A]
+
+    TODO: 
+    input '38 U.S.C.A. § 5103A(a), (b), (c)'  is currently transformed to
+    ['5103a', '', '']
+    which is wrong
+    better would be [5103] or ideally [5103a, 5103b, 5103c]
     """
     statute = statute_orig.replace(" ", "").lower()
 
@@ -73,8 +79,11 @@ def sections_from_statute(
         sections = new_sections
 
     assert len(sections) > 0, "no sections found in statute"
-    for section in sections:
-        assert(len(section)) > 0, "section is empty"
+    # for section in sections:
+        # if len(section) == 0:
+        #     pass
+            # raise ValueError(f"empty section found in statute: {statute_orig} with sections {sections}")
+    sections = [section for section in sections if len(section) != 0]
     return sections
 
 
@@ -83,6 +92,18 @@ def normalize_section(section):
 
 
 def normalize_case(inputs_orig):
+    """
+    transforms from
+    See Moreau v. Brown, 9 Vet. App. 389, 396 (1996)
+    to
+    [Moreau v. Brown, 9 Vet. App. 389, 396]
+    explanations:
+    - "see" or trailing commas are not part
+    of the citation but often in the data
+    - year numbers (1997) are not always present
+    - in Vet. App. 389, 396  we have the appendix
+    389 but page number 396. the page number is often not present
+    """
     inputs = remove_useless_prefix(inputs_orig)
 
     # remove trailing brackets from sections if the content is numeric
@@ -139,28 +160,12 @@ def normalize_case(inputs_orig):
     return inputs
 
 
-def normalize_and_segmentize_statute(
-        inputs, remove_subsections, remove_subsubsections) -> list[str]:
-    inputs = remove_useless_prefix(inputs)
-
-    book = book_from_statute(inputs)
+def normalize_statute(citation, remove_subsections, remove_subsubsections) -> str:
+    citation = remove_useless_prefix(citation)
+    book = book_from_statute(citation)
 
     sections = sections_from_statute(
-        inputs,
-        remove_subsubsections=remove_subsubsections,
-        remove_subsections=remove_subsections)
-    segments = [book + " § " + section for section in sections]
-    return segments
-
-
-def normalize_statute(
-        inputs, remove_subsections, remove_subsubsections) -> str:
-    """ does not split into segments"""
-    inputs = remove_useless_prefix(inputs)
-    book = book_from_statute(inputs)
-
-    sections = sections_from_statute(
-        inputs,
+        citation,
         remove_subsubsections=remove_subsubsections,
         remove_subsections=remove_subsections)
     if len(sections) == 1:
@@ -169,67 +174,58 @@ def normalize_statute(
         return book + " §§ " + ", ".join(sections)
 
 
-def remove_useless_prefix(inputs) -> str:
+def remove_useless_prefix(citation) -> str:
     """
     regex pattern for if "see" or "eg" "in" is at beginning of string
     has to work for "See, " "e.g. ", "See in ", ...
     """
     useless_prefix = re.compile(r"((see|e\.g\.|in|compare)\.?\,? )+")
 
-    useless_prefix_span = useless_prefix.search(inputs.lower())
+    useless_prefix_span = useless_prefix.search(citation.lower())
     if useless_prefix_span:
         if useless_prefix_span.start() == 0:
-            inputs = inputs[useless_prefix_span.end():]
-    return inputs
+            citation = citation[useless_prefix_span.end():]
+    return citation
 
 
-def normalize_citations(
-            inputs,
-            segmentize=False,
-            remove_subsections=False,
-            remove_subsubsections=True,
-        ):
-    """
-    splits a citation into segments
-    38 U.S.C.A. §§ 5100A, 5102(a)(1) becomes
-    [38 U.S.C.A. § 5100a, 38 U.S.C.A. § 5102a]
-
-    or if its not a statute
-
-    transforms from
-    See Moreau v. Brown, 9 Vet. App. 389, 396 (1996)
-    to
-    [Moreau v. Brown, 9 Vet. App. 389, 396]
-    explanations:
-    - "see" or trailing commas are not part
-    of the citation but often in the data
-    - year numbers (1997) are not always present
-    - in Vet. App. 389, 396  we have the appendix
-    389 but page number 396. the page number is often not present
-    """
-
-    try:
-        x = inputs.lower()
-        is_case = "§" not in x\
+def citation_is_case(x: str) -> bool:
+    """ citations are either to cases or statutes. this function determines this. """
+    x = x.lower()
+    is_case = "§" not in x\
             and "c.f.r" not in x\
             and "u.s.c.a" not in x\
             and "u.s.c." not in x\
             and "cfr" not in x
-        if segmentize:
-            if not is_case:
-                return normalize_and_segmentize_statute(
-                    inputs, remove_subsections, remove_subsubsections)
-            else:
-                inputs = normalize_case(inputs)
-                return [inputs]
-        else:
-            if not is_case:
-                return normalize_statute(
-                    inputs, remove_subsections, remove_subsubsections)
-            else:
-                return normalize_case(inputs)
+    return is_case
 
-    except Exception as e:
-        print(e)
-        print("inputs:", inputs)
-        return [inputs]
+
+def normalize_citation(
+            citation: str,
+            remove_subsections=False,
+            remove_subsubsections=True,
+        ) -> str:
+    
+    if citation_is_case(citation):
+        return normalize_case(citation)
+    else:        
+        return normalize_statute(
+            citation, remove_subsections, remove_subsubsections)
+
+
+def segmentize_citation(citation: str) -> list[str]:
+    """
+    WARNING assumes citations are already normalized
+
+    splits a citation into segments
+    38 U.S.C.A. §§ 5100A, 5102(a)(1) becomes 
+    [38 U.S.C.A. § 5100a, 38 U.S.C.A. § 5102a]
+    """
+    if citation_is_case(citation):
+        return [citation]
+    else:
+        book = book_from_statute(citation)
+
+        sections_str = citation.split("§")[-1].strip()
+        sections = sections_str.split(", ")
+        segments = [book + " § " + section for section in sections]
+        return segments

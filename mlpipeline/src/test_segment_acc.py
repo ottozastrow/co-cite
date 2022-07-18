@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from citation_normalization import normalize_citations, normalize_statute, sections_from_statute
+from citation_normalization import normalize_citation, normalize_statute, sections_from_statute, segmentize_citation
 from train_helpers import citation_segment_acc
 
 
@@ -14,11 +14,12 @@ def test_segmentize_statute():
     """
     x = "38 U.S.C.A. §§ 5100A, 5102(a)(1)"
     y = ["38u.s.c.a.§5100a", "38u.s.c.a.§5102a"]
-    ynew = normalize_citations(x, segmentize=True)
+    ynew = normalize_citation(x, remove_subsections=False, remove_subsubsections=True)
+    ynew = segmentize_citation(ynew)
     assert ynew == y, ynew
 
 
-def test_segemntize_case():
+def test_segmentize_case():
     """
     See Moreau v. Brown, 9 Vet. App. 389, 396 (1996)
     to
@@ -26,7 +27,8 @@ def test_segemntize_case():
     """
     x = "See Moreau v. Brown, 9 Vet. App. 389, 396 (1996)"
     y = ["moreauv.brown,9 vet.app. 389"]
-    ynew = normalize_citations(x, segmentize=True)
+    ynew = normalize_citation(x, remove_subsections=False, remove_subsubsections=True)
+    ynew = segmentize_citation(ynew)
     assert ynew == y, ynew
 
 

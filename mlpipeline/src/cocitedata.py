@@ -8,7 +8,7 @@ import tqdm
 from datasets import disable_caching
 from transformers import AutoTokenizer
 
-from citation_normalization import normalize_citations
+from citation_normalization import normalize_citation
 import parse_retrieval_data
 
 disable_caching()
@@ -67,17 +67,22 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
     if args.add_source_data:
         knowledge_kb = parse_retrieval_data.load_sources_kb(args)
 
-    for i in tqdm.tqdm(range(len(batches))):
+    pbar = tqdm.tqdm(range(len(batches)))
+    for i in pbar:
+        pbar.set_description(f"Began converting batch nr. {i} to df")
         df_chunks = []
         for file in batches[i]:
             # read data frame from json file
             documents = pd.read_json(file, lines=True)
             data = flatten_df(documents, args)  # expensive operation
-            if args.normalize_citations:
-                # apply normalize_citations(data["label"], segmentize=False)
-                data["label"] = data["label"].apply(lambda citation: normalize_citations(citation, segmentize=False))
-                import pdb
-                pdb.set_trace
+            
+            if not args.dont_normalize_citations:
+                pass
+                data["label"] = data["label"].apply(
+                    lambda citation: normalize_citation(
+                        citation,
+                        remove_subsections=True, remove_subsubsections=True))
+
             if args.add_source_data:
                 retrieval_data = add_retrieval_data(data, knowledge_kb, args)
                 # count number of dropped elements
@@ -89,7 +94,6 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
 
         df = pd.concat(df_chunks, copy=False, ignore_index=True)
         batch_fp = tmp_dir_name + "batch_" + str(i) + ".parquet"
-        print("finished converting batch nr. ", str(i), "to df")
         df = df.to_parquet(batch_fp, compression=None)
 
     print("dropped", dropped_sum, "elements for not finding their source docs")
@@ -261,11 +265,11 @@ def dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
     if args.samples != -1:
         length_str = str(args.samples)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
-    data_dir_name = "../data/generated_bva_variants/" +\
-        "type_" + dataset_type + "/" +\
-        "modelname_" + model_name_or_path + "/" +\
-        "normalized_" if not args.dont_normalize_citations else "" +\
-        "data_len_" + length_str + "/"
+    data_dir_name = "../data/generated_bva_variants/"
+    data_dir_name += dataset_type
+    data_dir_name += "model_" + model_name_or_path + "/"
+    if not args.dont_normalize_citations:
+        data_dir_name += "normalized/"
     return data_dir_name
 
 

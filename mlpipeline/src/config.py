@@ -25,8 +25,12 @@ def cmd_arguments(debug=False, testargs=None):
     ### decoding arguments
     parser.add_argument("--topk", type=int, help="top k for beam search and accuracy", default=3)
     parser.add_argument("--sample_decoding", help="use nucleus sampling top k as decoding method", action="store_true")
-    parser.add_argument("--fast_predict", help="use model.predict instead of model.generate. is 6x faster. doesnt support beamsearch or sampling", action="store_true")
+    parser.add_argument("--fast_predict",
+                        help="use model.predict instead of model.generate. is 6x faster. doesnt support beamsearch or sampling",
+                        action="store_true")  # Depprecated
     parser.add_argument("--temperature", help="for sample decoding", type=int, default=0.7)
+    # eval_batchsize
+    parser.add_argument("--eval_batchsize", type=int, help="batch size for evaluation", default=1)
 
     ## dataset arguments
     parser.add_argument("--input_tokens", type=int, help="input token length", default=256)
@@ -50,7 +54,9 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--drop_citations_without_source",
                         help="when add_source_data is set, drop all samples where no source was found",
                         action="store_true", default=True)
-    parser.add_argument("--dont_normalize_citations", help="normalize citations before building dataset", action="store_true")
+    parser.add_argument("--dont_normalize_citations",
+                        help="don't normalize citations before building dataset. only do this when evaluating benefits of normalizaiton",
+                        action="store_true")
 
     if testargs is None:
         args = parser.parse_args()

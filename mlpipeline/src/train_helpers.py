@@ -97,16 +97,12 @@ def citation_segment_acc(
         if args.diffsearchindex_training:
             x = x.split("[SEP]")[0]
             y = y.split("[SEP]")[0]
-    x = citation_normalization.normalize_citations(
+    x = citation_normalization.normalize_citation(
         x,
         remove_subsections=remove_subsections,
-        remove_subsubsections=remove_subsubsections,
-        segmentize=True)
-    y = citation_normalization.normalize_citations(
-        y,
-        remove_subsections=remove_subsections,
-        remove_subsubsections=remove_subsubsections,
-        segmentize=True)
+        remove_subsubsections=remove_subsubsections)
+    y = citation_normalization.segmentize_citation(y)
+    
     # compute accuracy
     # builds on assumption that x and y don't contain duplicates.
     # in the BVA corpus, this is true.
@@ -170,8 +166,8 @@ class CustomMetrics():
             beam = beams[i]
             for j in range(len(labels)):  # iterate through batch
 
-                x = citation_normalization.normalize_citations(beam[j])
-                y = citation_normalization.normalize_citations(labels[j])
+                x = citation_normalization.normalize_citation(beam[j])
+                y = citation_normalization.normalize_citation(labels[j])
                 exact_match = x == y
                 match_at_k[i, j] = exact_match
 
