@@ -50,6 +50,7 @@ def cmd_arguments(debug=False, testargs=None):
     parser.add_argument("--drop_citations_without_source",
                         help="when add_source_data is set, drop all samples where no source was found",
                         action="store_true", default=True)
+    parser.add_argument("--normalize_citations", help="normalize citations before building dataset", action="store_true")
 
     if testargs is None:
         args = parser.parse_args()
@@ -62,11 +63,11 @@ def cmd_arguments(debug=False, testargs=None):
     args.diffsearchindex_output_tokens += args.output_tokens
 
     if args.debug or debug:
-        args.samples = 10
+        args.samples = 2
         args.batchsize = 2
         args.input_tokens=8
         args.output_tokens=42
         args.epochs=1
-        # args.wandb_mode = "disabled"
+        args.wandb_mode = "disabled"
     args.contextlength = args.input_tokens * 4
     return args

@@ -114,7 +114,7 @@ def load_labels(args, filepaths):
         batch = batches[i]
         for file in batch:
             all_data = pd.read_json(file, lines=True) # read data frame from json file
-            data = cocitedata.preprocess_data(all_data, args)  # expensive operation
+            data = cocitedata.flatten_df(all_data, args)  # expensive operation
             if df is None:
                 df = data
             else:

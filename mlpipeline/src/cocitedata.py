@@ -71,8 +71,13 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
         df_chunks = []
         for file in batches[i]:
             # read data frame from json file
-            data = pd.read_json(file, lines=True)
-            data = preprocess_data(data, args)  # expensive operation
+            documents = pd.read_json(file, lines=True)
+            data = flatten_df(documents, args)  # expensive operation
+            if args.normalize_citations:
+                # apply normalize_citations(data["label"], segmentize=False)
+                data["label"] = data["label"].apply(lambda citation: normalize_citations(citation, segmentize=False))
+                import pdb
+                pdb.set_trace
             if args.add_source_data:
                 retrieval_data = add_retrieval_data(data, knowledge_kb, args)
                 # count number of dropped elements
@@ -163,7 +168,6 @@ def get_citation_context(x, args):
             stop_index = index  # TODO: also look at text after citation
             context = x['txt'][start_index:stop_index]
             citation = x['citation_texts'][i]
-            citation = normalize_citations(citation, segmentize=False)
             inputs.append(context)
             targets.append(citation)
         except:
@@ -174,7 +178,9 @@ def get_citation_context(x, args):
     return x
 
 
-def preprocess_data(df, args):
+def flatten_df(df: pd.DataFrame, args) -> pd.DataFrame:
+    """takes a dataframe where each row is a document
+    produces a dataframe where each row is a context-citation pair"""
     # read a fixed length context around each citation
     df = df.apply(get_citation_context, axis=1, args=(args,))
 
@@ -216,7 +222,7 @@ def create_tokenize_function(tokenizer, args):
     return tokenize_function
 
 
-def generate_ds_if_not_cached(data_dir_name, args):
+def generate_ds_if_not_cached(data_dir_name :str, args) -> None:
     # create parquet files from raw data if not already done
     if not os.path.exists(data_dir_name) or args.rebuild_dataset:
         tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
@@ -255,10 +261,11 @@ def dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
     if args.samples != -1:
         length_str = str(args.samples)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
-    data_dir_name = args.data_dir[:-1] +\
-        dataset_type +\
-        "_modelname_" + model_name_or_path +\
-        "_data_len_" + length_str + "/"
+    data_dir_name = "../data/generated_bva_variants/" +\
+        "type_" + dataset_type + "/" +\
+        "modelname_" + model_name_or_path + "/" +\
+        "normalized_" if args.normalize_text else "" +\
+        "data_len_" + length_str + "/"
     return data_dir_name
 
 
@@ -276,7 +283,6 @@ def load_dataset(args, model_name_or_path="unspecified"):
 
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
 
-    tokenizer.add_tokens([" §", "§"])
     # if tokenized dataset exists load it
     if os.path.exists(tokenized_data_dir_name) and not args.rebuild_dataset:
         print("loading tokenized dataset from", tokenized_data_dir_name)
@@ -284,6 +290,7 @@ def load_dataset(args, model_name_or_path="unspecified"):
         print("finished loading precomputed tokenized ds")
 
     else:
+        # tokenizer.add_tokens([" §", "§"]) 
         print("rebuilding dataset at ", tokenized_data_dir_name)
         generate_ds_if_not_cached(data_dir_name, args)
         df = parquet_to_dataset(data_dir_name, args)
