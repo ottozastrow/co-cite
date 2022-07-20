@@ -7,7 +7,7 @@ from wandb.keras import WandbCallback
 
 import cocitedata
 import train_helpers
-import keras_metric_callback
+import callbacks
 from config import cmd_arguments
 from train_helpers import CustomMetrics, SaveModelCallback, tokens_2_words
 
@@ -93,7 +93,7 @@ def main():
     ### build callbacks
     metric_fn_test = CustomMetrics(prefix="test_", args=args, top_ks=top_ks).fast_metrics
     metric_fn_train = CustomMetrics(prefix="train_", args=args, top_ks=top_ks).fast_metrics
-    metric_test_callback = keras_metric_callback.KerasMetricCallback(
+    metric_test_callback = callbacks.KerasMetricCallback(
         model=model,
         tokenizer=tokenizer,
         metric_fn=metric_fn_test,
@@ -102,7 +102,7 @@ def main():
         len_train_dataset = len(tokenized_train["label"]),
         top_ks=top_ks,
     )
-    metric_train_callback = keras_metric_callback.KerasMetricCallback(
+    metric_train_callback = callbacks.KerasMetricCallback(
         model=model,
         tokenizer=tokenizer,
         metric_fn=metric_fn_train,
@@ -113,7 +113,7 @@ def main():
     )
     wandb_callback = WandbCallback(save_model=not args.debug)
 
-    callbacks = [
+    callbacks_list = [
         wandb_callback,
         metric_test_callback, 
         metric_train_callback,
@@ -126,7 +126,7 @@ def main():
             args=args,
             len_train_dataset = len(tokenized_train["label"]),
         )
-        callbacks.append(save_model_callback)
+        callbacks_list.append(save_model_callback)
 
     ### train model
     if not args.notraining:
@@ -134,7 +134,7 @@ def main():
             tracker = EmissionsTracker()
             tracker.start()
 
-        model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs, callbacks=callbacks)
+        model.fit(x=tf_train_set, validation_data=tf_test_set, epochs=args.epochs, callbacks=callbacks_list)
 
         if not args.debug and args.co2_tracking:
             co2_emissions = tracker.stop()
