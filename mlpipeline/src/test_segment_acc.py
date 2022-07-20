@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from citation_normalization import normalize_citation, normalize_statute, sections_from_statute, segmentize_citation
-from train_helpers import citation_segment_acc
+from metrics import citation_segment_acc
 
 
 def test_segmentize_statute():

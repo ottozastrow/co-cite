@@ -9,7 +9,8 @@ import cocitedata
 import train_helpers
 import callbacks
 from config import cmd_arguments
-from train_helpers import CustomMetrics, SaveModelCallback, tokens_2_words
+from metrics import CustomMetrics
+from callbacks import SaveModelCallback
 
 
 def main():
@@ -22,7 +23,7 @@ def main():
 
     # TODO make from_pytorch dynamic. if tensorflow model or hub model set to false. else True.
     model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=args.from_pytorch)
-    tokenized_datasets, tokenizer = cocitedata.load_dataset(args, model_name_or_path=model.name_or_path)
+    tokenized_datasets, tokenizer = cocitedata.load_dataset(args)
 
     ### build datasets
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, return_tensors="tf")

@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
     wandb.init(project="cocite", tags=["DPR"], config=args, mode=args.wandb_mode)
 
-    data, tokenizer = cocitedata.load_dataset(args, args.modelname)
+    data, tokenizer = cocitedata.load_dataset(args)
 
     import pdb
     pdb.set_trace()

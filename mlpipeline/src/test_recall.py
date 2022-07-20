@@ -1,9 +1,11 @@
 import numpy as np
 from transformers import DataCollatorForSeq2Seq, TFAutoModelForSeq2SeqLM
 
-
-from train_helpers import CustomMetrics, citation_segment_acc, mean_over_metrics_batches, plot_precision_recall
+from train_helpers import mean_over_metrics_batches
+from plots import plot_precision_recall
+from metrics import CustomMetrics, citation_segment_acc
 from cocitedata import load_dataset
+
 
 from config import cmd_arguments
 args = cmd_arguments(debug=False)

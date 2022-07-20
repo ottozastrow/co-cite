@@ -1,9 +1,7 @@
-import os
-import re
+
 import time
 
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go
 
 import numpy as np
 import tensorflow as tf
@@ -11,127 +9,8 @@ import tqdm
 import wandb
 import pandas as pd
 
-
-import citation_normalization
-
-
-
-def normalize(x):
-    # first remove year:
-    # "1vet.app.49(c), 55 (1990)"
-    # -> 1vet.app.49(c), 55
-    if len(x) > 2:
-        if x[-1] == ")" and x[-2].isnumeric():
-            x = x.rsplit("(", 1)[0]
-    return x.lower().replace(" ", "").replace("(", "").replace(")", "")
-
-
-def citation_segment_acc(
-        prediction, label,
-        remove_subsections, remove_subsubsections, args=None) -> list[bool]:
-    """
-    assumes unbatched inputs
-
-    converts from list of strings of this kind
-    38 U.S.C.A. §§ 5100, 5102, 5103, 5103A, 5106, 5107
-    to list of list of strings such that
-    [38 U.S.C.A. § 5100, 38 U.S.C.A. § 5102, ...]
-
-    then computes acc accross both
-
-    """
-    accs = []
-    x = prediction
-    y = label
-    if args:
-        if args.diffsearchindex_training:
-            x = x.split("[SEP]")[0]
-            y = y.split("[SEP]")[0]
-    x = citation_normalization.normalize_citation(
-        x,
-        remove_subsections=remove_subsections,
-        remove_subsubsections=remove_subsubsections)
-    y = citation_normalization.segmentize_citation(y)
-    
-    # compute accuracy
-    # builds on assumption that x and y don't contain duplicates.
-    # in the BVA corpus, this is true.
-    # for every el in y, check if x has el
-    contained = [el in x for el in y]
-    contained = []
-    for yi in y:
-        contains = []
-        for xi in x:
-            contains.append(yi in xi)
-        contained.append(any(contains))
-    accs.extend(contained)
-    return accs
-
-
-# def logits_to_topk(logits, k):
-#     # use beam search to get the top k predictions
-#     # tf requires length x batchsize x num_classes
-#     logits_tf = tf.reshape(logits, (logits.shape[1], logits.shape[0], logits.shape[2]))
-#     sequence_length = tf.ones(logits.shape[0], dtype=tf.int32) * logits.shape[1]
-
-#     beams, log_probs = ctc_beam_search_decoder(
-#         logits_tf, sequence_length=sequence_length, 
-#         beam_width=k,
-#         top_paths=k
-#     )
-
-#     beams = [tf.sparse.to_dense(b) for b in beams]
-
-#     return beams, log_probs
-
-
-class CustomMetrics():
-    def __init__(self, prefix, args, top_ks):
-        self.prefix = prefix
-        self.args = args
-        self.top_ks = top_ks
-
-    def fast_metrics(self, beams, labels, several_beams=False) -> dict:
-        """
-        tupledict is a tuple of (dict(list()), list())
-        its counterintuitive but I'll keep it since the huggingface
-        library uses it as interface
-        """
-
-        if not several_beams:
-            beams = [beams]
-
-        ### accuracies
-        # correctness of batchsize x beam_index
-        top_ks = [1, 3, 5, 20]
-        max_k = max(top_ks)
-        max_k = min(max_k, len(beams))
-        top_ks = [k for k in top_ks if k <= max_k]
-
-        match_at_k = np.zeros((len(beams), len(labels)))
-        matches = {}
-        results = {}
-        # iterate through all beams
-        for i in range(len(beams)):
-            beam = beams[i]
-            for j in range(len(labels)):  # iterate through batch
-
-                x = citation_normalization.normalize_citation(beam[j])
-                y = citation_normalization.normalize_citation(labels[j])
-                exact_match = x == y
-                match_at_k[i, j] = exact_match
-
-        for k in top_ks:
-            matches_topk = np.any(match_at_k[:k, :], axis=0)
-            matches_topk = np.array(matches_topk).astype(int)
-
-            matches[k] = matches_topk
-            topk_acc = np.mean(matches_topk)
-            results[self.prefix + "top{}_acc".format(k)] = topk_acc
-
-        top1matches = list(match_at_k[0])
-
-        return results, matches
+import metrics
+import plots
 
 
 def rearrange_model_generate(predictions, args):
@@ -144,17 +23,6 @@ def rearrange_model_generate(predictions, args):
         for j in range(args.topk):
             beams[j].append(predictions[i*args.topk + j])
     return beams
-
-
-def batch_accuracy(predictions, labels):
-    """Computes sequence wise accuracy.
-    Args:
-        predictions: predictions of shape (batch_size, sequence_length)
-        labels: labels of shape (batch_size, sequence_length)
-    Returns:
-        accuracy: average accuracy of the predictions"""
-
-    return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
 
 
 def tokens_2_words(tokenizer, predictions, labels, inputs=None):
@@ -258,14 +126,14 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         # iterate over elements in batchs
         for i in range(len(decoded_labels)):
             segment_accs_no_subsections.extend(
-                citation_segment_acc(
+                metrics.citation_segment_acc(
                     beams[0][i], decoded_labels[i],
                     remove_subsections=True, remove_subsubsections=True,
                     args=args,
                 )
             )
 
-            segment_acc = citation_segment_acc(
+            segment_acc = metrics.citation_segment_acc(
                 beams[0][i], decoded_labels[i], args=args,
                 remove_subsections=False, remove_subsubsections=True)
             segment_accs.extend(segment_acc)
@@ -300,7 +168,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     all_scores = np.array(all_scores)
     try:
-        plot = plot_precision_recall(all_matches, all_scores, top_ks=top_ks)
+        plot = plots.plot_precision_recall(all_matches, all_scores, top_ks=top_ks)
         wandb.log({prefix + "_precision_recall": plot})
 
     except:
@@ -308,86 +176,9 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     table = pd.DataFrame(samples_table, columns=columns)
 
-    plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
+    plots.plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
 
     return results
-
-
-def plot_precision_recall(matches, scores, top_ks, buckets=40):
-    # find threshold such that scores is split into equal buckets
-    scores_sorted = np.sort(scores)
-    scores_sorted = scores_sorted[::-1]
-    # thresholds are periodically taken across sorted scores
-    thresholds = [scores_sorted[(len(scores) // buckets) * i]
-                  for i in range(buckets)]
-
-    for k in top_ks:
-        # for every threshold, compute the precision
-        precisions = []
-        for threshold in thresholds:
-            # compute the number of true positives
-            true_positives = np.sum(matches[k] & (scores >= threshold))
-            # compute the number of false positives
-            false_positives = np.sum(np.logical_not(
-                matches[k]) & (scores >= threshold))
-            # compute the precision
-            precision = true_positives / (true_positives + false_positives)
-            # append the precision to the list of precisions
-            precisions.append(precision)
-
-        # plot curve
-        # plt.legend(["top " + str(k)])
-        plt.plot([i/buckets for i in range(buckets)], precisions, label="top " + str(k))
-        # plot with legend
-        # yaxsis, xaxis, title
-    plt.xlabel('recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
-
-    return plt
-
-
-def plot_accs_per_occurrence(df, columns):
-    df = df.sort_values(by="label_occurrences", ascending=False)
-    # show average of new_segment_acc per quantile occurences
-    # compute average of segment_acc over 10 buckets of label_occurrences
-    # convert df to list
-    df_list = df.to_dict("records")
-    num_buckets = 40
-    num_buckets = min(num_buckets, len(df_list))
-    df_list_split = np.array_split(df_list, num_buckets)
-    quantiles = {}
-    x_titles = []
-
-    for column in columns:
-        quantiles[column] = []
-        for i, df_list_i in enumerate(df_list_split):
-            index = str(df_list_i[0]["label_occurrences"]) + " - "\
-                + str(df_list_i[-1]["label_occurrences"])
-            x_titles.append(index)
-            # compute average of segment_acc over 10 buckets of label_occurrences
-            avg = np.array(
-                    [row[column] for row in df_list_i]
-            ).mean()
-            quantiles[column].append(avg)
-
-    fig = go.Figure()
-    for column in columns:
-        fig.add_bar(
-            name=column,
-            x=x_titles,
-            y=list(quantiles[column]))
-
-    # fig.update_layout(barmode='stack')
-    # fig.update_layout(barmode="relative")
-    fig.update_layout(title_text="Average Segment Accuracy per Quantile Occurrences")
-
-    # x axis = occurrence range
-    fig.update_xaxes(title_text="Occurrence Range")
-    # y axis = average segment accuracy
-    fig.update_yaxes(title_text="Average Segment Accuracy")
-    # fig.show()
-    wandb.log({"avg_segment_acc_per_quantile": fig})
 
 
 def mean_over_metrics_batches(batchwise_metrics):

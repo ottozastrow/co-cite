@@ -253,7 +253,7 @@ def generate_ds_if_not_cached(data_dir_name :str, args) -> None:
         print("parquet file already exists, loading parquet...")
 
 
-def raw_dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
+def raw_dataset_filepath(args, dataset_type="") -> str:
     # determine name of dataset based on args
     dataset_type = ""
     if args.add_source_data:
@@ -277,19 +277,25 @@ def raw_dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
     return data_dir_name
 
 
-def tokenized_dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
+def tokenized_dataset_filepath(args, tokenizer_name_or_path="", dataset_type="") -> str:
     # determine name of dataset based on args
-    data_dir_name = raw_dataset_filepath(args, model_name_or_path, dataset_type)
+    data_dir_name = raw_dataset_filepath(args, dataset_type)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
     data_dir_name = data_dir_name[:-1]  # remove last '/'
-    data_dir_name += "tokenized_with_" + model_name_or_path + "/"
+    data_dir_name += "_tokenized_with_" + tokenizer_name_or_path + "/"
     
     return data_dir_name
 
 
-def load_dataset(args, model_name_or_path="unspecified"):
-    data_dir_name = raw_dataset_filepath(args, model_name_or_path)
-    tokenized_data_dir_name = tokenized_dataset_filepath(args, model_name_or_path)
+def load_dataset(args):
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+
+    # "<class 'transformers.models.t5.tokenization_t5_fast.T5TokenizerFast'>" 
+    # turns the above into T5TokenizerFast
+    tokenizer_name_or_path: str = str(type(tokenizer)).split(".")[-1].replace("'>", "")
+
+    data_dir_name = raw_dataset_filepath(args, tokenizer_name_or_path)
+    tokenized_data_dir_name = tokenized_dataset_filepath(args, tokenizer_name_or_path)
 
     args.parquet_data_dir_name = data_dir_name
 
@@ -297,8 +303,6 @@ def load_dataset(args, model_name_or_path="unspecified"):
         "data_dir_name": data_dir_name,
         "tokenized_data_dir_name": tokenized_data_dir_name
     })
-
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
 
     # if tokenized dataset exists load it
     if os.path.exists(tokenized_data_dir_name) and not args.rebuild_dataset:
