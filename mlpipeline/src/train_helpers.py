@@ -14,7 +14,6 @@ import plots
 import csv
 
 
-
 def rearrange_model_generate(predictions, args):
     # annoying reformatting because of transformers.model.generate output is flattened (batchsize x beams)
     beams = [[] for i in range(args.topk)]
@@ -76,6 +75,40 @@ def generate_batch(model, inputs, args):
     return beams, scores, latency
 
 
+def load_occurrences(args):
+    # load occurences dict from csv args.data_dir/occurrences.csv
+    with open(args.parquet_data_dir_name + "/occurrences.csv", "r") as f:
+        reader = csv.reader(f)
+        occurences_map = {rows[0]: int(rows[1]) for rows in reader}
+    print("loaded occurences. found ", len(occurences_map), " entries")
+
+
+def match_occurrences(decoded_labels, occurrence_map):
+    occurrences = []
+    for label in decoded_labels:
+        if label in occurrence_map.keys():
+            occurrences.append(occurrence_map[label])
+        else:
+            print("didn't find label in occurences_map: ", label)
+            occurrences.append(None)
+
+
+def build_wandb_table_row(
+        beams, decoded_labels, decoded_inputs, scores,
+        occurrences, mean_segment_accs, matches):
+    ### results table for wandb
+        # change dim ordering of list of lists
+    beams_reorderd = [list(i) for i in zip(*beams)]
+    columns_list = [
+        decoded_inputs, beams[0], decoded_labels, occurrences,
+        scores, mean_segment_accs, beams_reorderd
+    ]
+    columns_list.extend(list(matches.values()))
+    columns_list = list(columns_list)
+    row = [list(t) for t in zip(*(columns_list))]
+    return row
+
+
 def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     print("starting eval" + prefix)
     samples_table = []
@@ -91,11 +124,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     for k in top_ks:
         all_matches[k] = []
     
-    # load occurences dict from csv args.data_dir/occurrences.csv
-    with open(args.parquet_data_dir_name + "/occurrences.csv", "r") as f:
-        reader = csv.reader(f)
-        occurences_map = {rows[0]: int(rows[1]) for rows in reader}
-    print("loaded occurences. found ", len(occurences_map), " entries")
+    occurences_map = load_occurrences(args)
 
     decoding_latencies = []
     all_scores = []
@@ -103,19 +132,15 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     
     for batch in tqdm.tqdm(dataset):
         beams, scores, latency = generate_batch(model, batch["inputs"], args)
+
         decoding_latencies.append(latency)
         decoded_labels, beams, decoded_inputs = tokens_2_words(
             tokenizer,beams, batch["labels"], batch["inputs"])
+        
         metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
         all_scores += scores
 
-        occurrences = []
-        for label in decoded_labels:
-            if label in occurences_map.keys():
-                occurrences.append(occurences_map[label])
-            else:
-                print("didn't find label in occurences_map: ", label)
-                occurrences.append(None)
+        occurrences = match_occurrences(decoded_labels, occurences_map)
 
         # add matches dict to all matches
         for k in list(matches.keys()):
@@ -140,18 +165,11 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             segment_accs.extend(segment_acc)
             mean_segment_accs.append(np.mean(segment_acc))
 
-        ### results table for wandb
-        # change dim ordering of list of lists
-        beams_reorderd = [list(i) for i in zip(*beams)]
         metric_outputs.append(metric_output)
-        columns_list = [
-            decoded_inputs, beams[0], decoded_labels, occurrences,
-            scores, mean_segment_accs, beams_reorderd
-        ]
-        columns_list.extend(list(matches.values()))
-        columns_list = list(columns_list)
-        rows = [list(t) for t in zip(*(columns_list))]
-        samples_table += rows
+             
+        samples_table += build_wandb_table_row(
+            beams, decoded_labels, decoded_inputs, scores,
+            occurrences, mean_segment_accs, matches)
 
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
                "scores", "segment_acc", "all_topk_predictions"]
