@@ -357,8 +357,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         print("WARNING: exception in plot precision recall")
 
     table = pd.DataFrame(samples_table, columns=columns)
-    # import pdb
-    # pdb.set_trace()
+
     plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
 
     return results

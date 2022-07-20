@@ -5,10 +5,11 @@ import shutil
 import datasets
 import pandas as pd
 import tqdm
+import wandb
 from datasets import disable_caching
 from transformers import AutoTokenizer
 
-from citation_normalization import normalize_citation
+from citation_normalization import normalize_citation, update_tokenizer
 import parse_retrieval_data
 
 disable_caching()
@@ -77,7 +78,6 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
             data = flatten_df(documents, args)  # expensive operation
             
             if not args.dont_normalize_citations:
-                pass
                 data["label"] = data["label"].apply(
                     lambda citation: normalize_citation(
                         citation,
@@ -253,7 +253,7 @@ def generate_ds_if_not_cached(data_dir_name :str, args) -> None:
         print("parquet file already exists, loading parquet...")
 
 
-def dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
+def raw_dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
     # determine name of dataset based on args
     dataset_type = ""
     if args.add_source_data:
@@ -267,19 +267,32 @@ def dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
     data_dir_name = "../../data/generated_bva_variants/"
     data_dir_name += dataset_type
-    data_dir_name += "model_" + model_name_or_path + "/"
+    data_dir_name += "data_len_" + length_str + "/"
+    data_dir_name += str(args.input_tokens) + "_input_tokens/"
     if not args.dont_normalize_citations:
         data_dir_name += "normalized/"
+    else:
+        data_dir_name += "not_normalized/"
+
+    return data_dir_name
+
+
+def tokenized_dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
+    # determine name of dataset based on args
+    data_dir_name = raw_dataset_filepath(args, model_name_or_path, dataset_type)
+    assert args.data_dir[-1] == "/", "data_dir must end with '/'"
+    data_dir_name = data_dir_name[:-1]  # remove last '/'
+    data_dir_name += "tokenized_with_" + model_name_or_path + "/"
+    
     return data_dir_name
 
 
 def load_dataset(args, model_name_or_path="unspecified"):
-    data_dir_name = dataset_filepath(args, model_name_or_path)
-    tokenized_data_dir_name = data_dir_name[:-1] + "_tokenized/"
+    data_dir_name = raw_dataset_filepath(args, model_name_or_path)
+    tokenized_data_dir_name = tokenized_dataset_filepath(args, model_name_or_path)
 
     args.parquet_data_dir_name = data_dir_name
 
-    import wandb
     wandb.config.update({
         "data_dir_name": data_dir_name,
         "tokenized_data_dir_name": tokenized_data_dir_name
@@ -294,7 +307,9 @@ def load_dataset(args, model_name_or_path="unspecified"):
         print("finished loading precomputed tokenized ds")
 
     else:
-        # tokenizer.add_tokens([" §", "§"]) 
+        assert args.dont_normalize_citations == False, "tokenizer update assumes normalization"
+        tokenizer = update_tokenizer(tokenizer)
+
         print("rebuilding dataset at ", tokenized_data_dir_name)
         generate_ds_if_not_cached(data_dir_name, args)
         df = parquet_to_dataset(data_dir_name, args)

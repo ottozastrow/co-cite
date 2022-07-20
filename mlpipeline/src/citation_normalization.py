@@ -91,6 +91,30 @@ def normalize_section(section):
     return section.replace(" ", "").replace("(", "").replace(")", "").lower()
 
 
+case_categories = [
+    ("Vet. App.", r"vet\.? ?app\.?"),
+    ("F.3d", r"f\.? ?3d?"),
+    ("F.2d", r"f\.? ?2d?"),
+    ("F.d", r"f\.? ?d"),
+    ("F. supp", r"f\.? ?supp.?"),
+    ("Fed. Cir.", r"fed\.? ?cir\.?"),
+]
+
+def update_tokenizer(tokenizer):
+    """
+    updates the tokenizer with common tokens for statutes and cases
+    """
+    new_tokens = 0
+    for (category, _) in case_categories:
+        new_tokens = tokenizer.add_tokens([" " + category])
+    statute_tokens = ["38 U.S.C.A. §", "38 C.F.R. §", "§"]
+    new_tokens += tokenizer.add_tokens(statute_tokens)
+    if new_tokens > 0:
+        print(f"added {new_tokens} tokens to tokenizer")
+
+    return tokenizer
+
+
 def normalize_case(inputs_orig):
     """
     transforms from
@@ -113,16 +137,8 @@ def normalize_case(inputs_orig):
     # check if inputs begins with see
     lowered_inputs = inputs.lower()
 
-    law_categories = [
-        ("Vet. App.", r"vet\.? ?app\.?"),
-        ("F.3d", r"f\.? ?3d?"),
-        ("F.2d", r"f\.? ?2d?"),
-        ("F.d", r"f\.? ?d"),
-        ("F. supp", r"f\.? ?supp.?"),
-        ("Fed. Cir.", r"fed\.? ?cir\.?"),
-    ]
     patterns = []
-    for category, regex in law_categories:
+    for category, regex in case_categories:
         patterns.append((category, re.compile(regex)))
 
     """
