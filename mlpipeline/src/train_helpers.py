@@ -11,6 +11,8 @@ import pandas as pd
 
 import metrics
 import plots
+import csv
+
 
 
 def rearrange_model_generate(predictions, args):
@@ -36,8 +38,48 @@ def tokens_2_words(tokenizer, predictions, labels, inputs=None):
     return decoded_predictions, decoded_labels, decoded_inputs
 
 
+def generate_batch(model, inputs, args):
+    # timeit
+    start = time.time()
+    # generate predictions
+    modeloutdict = model.generate(
+        inputs, num_beams=args.topk,
+        num_return_sequences=args.topk,
+        do_sample=args.sample_decoding, top_k=args.topk, early_stopping=True,
+        output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
+    
+    # timeit
+    end = time.time()
+    latency = end - start
+
+    scores = modeloutdict["scores"]
+    predictions = modeloutdict["sequences"]
+
+
+    if args.topk != 1:
+        beams = rearrange_model_generate(predictions, args)
+        scores = list(scores.numpy())
+        scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
+    else:
+        # when args.topk == 1, predictions is a tuple of logits (tensor)
+        # of shape seqlen x batchsize x vocabsize
+
+        scores = tf.convert_to_tensor(scores)
+        probabilities = tf.reduce_max(scores, axis=2)
+        mean_probabilites = tf.reduce_mean(probabilities, axis=0)
+
+        scores = mean_probabilites.numpy().tolist()
+
+        beams = [predictions]
+    
+
+    return beams, scores, latency
+
+
 def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     print("starting eval" + prefix)
+    samples_table = []
+
     metric_outputs = []
     segment_accs = []  # a given target may contain several segments.
     segment_accs_no_subsections = []
@@ -48,9 +90,8 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     all_matches = {}
     for k in top_ks:
         all_matches[k] = []
-
+    
     # load occurences dict from csv args.data_dir/occurrences.csv
-    import csv
     with open(args.parquet_data_dir_name + "/occurrences.csv", "r") as f:
         reader = csv.reader(f)
         occurences_map = {rows[0]: int(rows[1]) for rows in reader}
@@ -58,38 +99,15 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     decoding_latencies = []
     all_scores = []
-    samples_table = []
+
+    
     for batch in tqdm.tqdm(dataset):
-        inputs = batch["input_ids"]
-        labels = batch["labels"]
-        # timeit
-        start = time.time()
-        # generate predictions
-        if not args.fast_predict:
-            modeloutdict = model.generate(
-                inputs, num_beams=args.topk,
-                num_return_sequences=args.topk,
-                do_sample=args.sample_decoding, top_k=args.topk, early_stopping=True,
-                output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
-        else:
-            assert not (args.topk > 1 or args.sample_decoding), "fast predict doesn't support beam search"
-
-            modeloutput = model.predict({"input_ids": inputs, "decoder_input_ids": inputs})
-            logits = modeloutput.logits
-
-            sequences = tf.argmax(logits, axis=-1)
-            modeloutdict = {
-                "sequences": sequences,
-                "scores": modeloutput.logits
-            }
-        # timeit
-        end = time.time()
-        decoding_latencies.append(end - start)
-
-        scores = modeloutdict["scores"]
-        predictions = modeloutdict["sequences"]
-
-        decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(tokenizer, predictions, labels, inputs=inputs)
+        beams, scores, latency = generate_batch(model, batch["inputs"], args)
+        decoding_latencies.append(latency)
+        decoded_labels, beams, decoded_inputs = tokens_2_words(
+            tokenizer,beams, batch["labels"], batch["inputs"])
+        metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
+        all_scores += scores
 
         occurrences = []
         for label in decoded_labels:
@@ -99,31 +117,14 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
                 print("didn't find label in occurences_map: ", label)
                 occurrences.append(None)
 
-        if args.topk != 1:
-            beams = rearrange_model_generate(decoded_predictions, args)
-            scores = list(scores.numpy())
-            scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
-        else:
-            # when args.topk == 1, predictions is a tuple of logits (tensor)
-            # of shape seqlen x batchsize x vocabsize
-
-            scores = tf.convert_to_tensor(scores)
-            probabilities = tf.reduce_max(scores, axis=2)
-            mean_probabilites = tf.reduce_mean(probabilities, axis=0)
-
-            scores = mean_probabilites.numpy().tolist()
-
-            beams = [decoded_predictions]
-
-        metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
-
         # add matches dict to all matches
         for k in list(matches.keys()):
             all_matches[k].extend(matches[k])
 
-        all_scores += scores
         mean_segment_accs = []
-        # iterate over elements in batchs
+
+        ### segment accuracy metrics
+        # iterate over elements in batches
         for i in range(len(decoded_labels)):
             segment_accs_no_subsections.extend(
                 metrics.citation_segment_acc(
@@ -139,6 +140,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             segment_accs.extend(segment_acc)
             mean_segment_accs.append(np.mean(segment_acc))
 
+        ### results table for wandb
         # change dim ordering of list of lists
         beams_reorderd = [list(i) for i in zip(*beams)]
         metric_outputs.append(metric_output)
@@ -150,6 +152,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         columns_list = list(columns_list)
         rows = [list(t) for t in zip(*(columns_list))]
         samples_table += rows
+
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
                "scores", "segment_acc", "all_topk_predictions"]
     topk_keys = ["top-" + str(i) for i in all_matches.keys()]
@@ -171,8 +174,8 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         plot = plots.plot_precision_recall(all_matches, all_scores, top_ks=top_ks)
         wandb.log({prefix + "_precision_recall": plot})
 
-    except:
-        print("WARNING: exception in plot precision recall")
+    except Exception as e:
+        print("WARNING: exception in plot precision recall:", e)
 
     table = pd.DataFrame(samples_table, columns=columns)
 
