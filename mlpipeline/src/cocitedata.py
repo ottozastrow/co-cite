@@ -265,7 +265,7 @@ def dataset_filepath(args, model_name_or_path="", dataset_type="") -> str:
     if args.samples != -1:
         length_str = str(args.samples)
     assert args.data_dir[-1] == "/", "data_dir must end with '/'"
-    data_dir_name = "../data/generated_bva_variants/"
+    data_dir_name = "../../data/generated_bva_variants/"
     data_dir_name += dataset_type
     data_dir_name += "model_" + model_name_or_path + "/"
     if not args.dont_normalize_citations:

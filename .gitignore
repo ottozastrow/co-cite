@@ -5,7 +5,7 @@
 **.gz
 **elasticsearch**
 **.gz.*
-data/
+data/**
 
 #loggings
 *lsf.o**
