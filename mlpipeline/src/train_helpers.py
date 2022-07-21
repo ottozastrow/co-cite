@@ -19,15 +19,8 @@ def rearrange_model_generate(predictions, args) -> list:
     """
     if args.topk != 1:
         beams: list = [[] for i in range(args.topk)]
-        assert len(predictions) == args.topk * args.batchsize,\
-            f"assuming this format as output from generate() {len(predictions)} {args.batchsize} {args.topk}"
         for i in range(args.topk):
             beams[i] = predictions[i::args.topk]
-        # predictions = beams
-        # assuming predictions is batchsize x beam_num x tokens
-        # for i in range(args.batchsize):
-        #     for j in range(args.topk):
-        #         beams[j].append(predictions[i*args.topk + j])
         return beams
     else:
         return [predictions]
