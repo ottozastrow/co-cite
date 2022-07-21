@@ -55,49 +55,44 @@ def batch_accuracy(predictions, labels):
     return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
 
 
-class CustomMetrics():
-    def __init__(self, args, top_ks):
-        self.args = args
-        self.top_ks = top_ks
+def matches_at_k(beams, labels, top_ks, several_beams=False) -> tuple[dict, dict]:
+    """
+    tupledict is a tuple of (dict(list()), list())
+    its counterintuitive but I'll keep it since the huggingface
+    library uses it as interface
+    """
 
-    def fast_metrics(self, beams, labels, several_beams=False) -> tuple[dict, dict]:
-        """
-        tupledict is a tuple of (dict(list()), list())
-        its counterintuitive but I'll keep it since the huggingface
-        library uses it as interface
-        """
+    if not several_beams:
+        beams = [beams]
 
-        if not several_beams:
-            beams = [beams]
+    ### accuracies
+    # correctness of batchsize x beam_index
+    top_ks = [1, 3, 5, 20]
+    max_k = max(top_ks)
+    max_k = min(max_k, len(beams))
+    top_ks = [k for k in top_ks if k <= max_k]
 
-        ### accuracies
-        # correctness of batchsize x beam_index
-        top_ks = [1, 3, 5, 20]
-        max_k = max(top_ks)
-        max_k = min(max_k, len(beams))
-        top_ks = [k for k in top_ks if k <= max_k]
+    match_at_k = np.zeros((len(beams), len(labels)))
+    matches = {}
+    results = {}
+    # iterate through all beams
+    for i in range(len(beams)):
+        beam = beams[i]
+        for j in range(len(labels)):  # iterate through batch
 
-        match_at_k = np.zeros((len(beams), len(labels)))
-        matches = {}
-        results = {}
-        # iterate through all beams
-        for i in range(len(beams)):
-            beam = beams[i]
-            for j in range(len(labels)):  # iterate through batch
+            x = citation_normalization.normalize_citation(beam[j])
+            y = citation_normalization.normalize_citation(labels[j])
+            exact_match = x == y
+            match_at_k[i, j] = exact_match
 
-                x = citation_normalization.normalize_citation(beam[j])
-                y = citation_normalization.normalize_citation(labels[j])
-                exact_match = x == y
-                match_at_k[i, j] = exact_match
+    for k in top_ks:
+        matches_topk = np.any(match_at_k[:k, :], axis=0)
+        matches_topk = np.array(matches_topk).astype(int)
 
-        for k in top_ks:
-            matches_topk = np.any(match_at_k[:k, :], axis=0)
-            matches_topk = np.array(matches_topk).astype(int)
+        matches[k] = matches_topk
+        topk_acc = np.mean(matches_topk)
+        results[f"top{k}_acc"] = topk_acc
 
-            matches[k] = matches_topk
-            topk_acc = np.mean(matches_topk)
-            results[f"top{k}_acc"] = topk_acc
+    top1matches = list(match_at_k[0])
 
-        top1matches = list(match_at_k[0])
-
-        return results, matches
+    return results, matches

@@ -9,7 +9,6 @@ import cocitedata
 import train_helpers
 import callbacks
 from config import cmd_arguments
-from metrics import CustomMetrics
 from callbacks import SaveModelCallback
 
 
@@ -30,9 +29,9 @@ def main():
     tokenized_train = tokenized_datasets["train"]
     tokenized_test = tokenized_datasets["test"]
 
-    # if args.debug:
-    #     tokenized_train = tokenized_train.select(list(range(2)))
-    #     tokenized_test = tokenized_test.select(list(range(2)))
+    if args.debug:
+        tokenized_train = tokenized_train.select(list(range(2)))
+        tokenized_test = tokenized_test.select(list(range(2)))
 
     training_columns = ["attention_mask", "input_ids", "labels", "label_occurrences"]
     tf_train_set = tokenized_train.to_tf_dataset(
@@ -92,12 +91,9 @@ def main():
     top_ks = [k for k in top_ks if k <= max_k]
 
     ### build callbacks
-    metric_fn_test = CustomMetrics(args=args, top_ks=top_ks).fast_metrics
-    metric_fn_train = CustomMetrics(args=args, top_ks=top_ks).fast_metrics
     metric_test_callback = callbacks.KerasMetricCallback(
         model=model,
         tokenizer=tokenizer,
-        metric_fn=metric_fn_test,
         eval_dataset=generation_test_dataset, prefix="test_",
         args=args, batch_size=args.batchsize,
         len_train_dataset = len(tokenized_train["label"]),
@@ -106,7 +102,6 @@ def main():
     metric_train_callback = callbacks.KerasMetricCallback(
         model=model,
         tokenizer=tokenizer,
-        metric_fn=metric_fn_train,
         eval_dataset=generation_train_dataset, prefix="train_",
         args=args, batch_size=args.batchsize,
         len_train_dataset = len(tokenized_train["label"]),
@@ -145,11 +140,11 @@ def main():
     if not args.noevaluation:
         train_helpers.evaluate(
             model, tf_test_set,
-            metric_fn_test, prefix="test_", args=args,
+            prefix="test_", args=args,
             top_ks=top_ks, tokenizer=tokenizer)
         train_helpers.evaluate(
             model, generation_train_dataset,
-            metric_fn_train, prefix="train_", args=args,
+            prefix="train_", args=args,
             top_ks=top_ks, tokenizer=tokenizer)
 
 if __name__ == "__main__":

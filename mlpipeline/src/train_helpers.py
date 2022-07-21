@@ -116,7 +116,7 @@ def build_wandb_table_row(
     return row
 
 
-def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
+def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     print("starting eval" + prefix)
     samples_table = []
 
@@ -130,18 +130,18 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     occurences_map = load_occurrences(args)
 
     all_scores = []
-    metric_outputs_v2 = collections.defaultdict(list)
+    metric_outputs = collections.defaultdict(list)
     
     for batch in tqdm.tqdm(dataset):
         predictions, scores, latency = generate_batch(model, batch["input_ids"], args)
-        metric_outputs_v2["latency"].append(latency)
+        metric_outputs["latency"].append(latency)
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(
             tokenizer, predictions, batch["labels"], batch["input_ids"])
 
         beams = rearrange_model_generate(decoded_predictions, args)
 
-        metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
+        metric_output, matches = metrics.matches_at_k(beams, decoded_labels, top_ks=top_ks, several_beams=True)
         all_scores += scores
         
         occurrences = match_occurrences(decoded_labels, occurences_map)
@@ -155,7 +155,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         ### segment accuracy metrics
         # iterate over elements in batches
         for i in range(len(decoded_labels)):
-            metric_outputs_v2["segment_accs_no_subsections"].extend(
+            metric_outputs["segment_accs_no_subsections"].extend(
                 metrics.citation_segment_acc(
                     beams[0][i], decoded_labels[i],
                     remove_subsections=True, remove_subsubsections=True,
@@ -166,13 +166,13 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             segment_acc = metrics.citation_segment_acc(
                 beams[0][i], decoded_labels[i], args=args,
                 remove_subsections=False, remove_subsubsections=True)
-            metric_outputs_v2["segment_accs"].extend(segment_acc)
+            metric_outputs["segment_accs"].extend(segment_acc)
             
             mean_segment_accs.append(np.mean(segment_acc))
-            metric_outputs_v2["mean_segment_accs"].append(np.mean(segment_acc))
+            metric_outputs["mean_segment_accs"].append(np.mean(segment_acc))
 
         for metric in metric_output.keys():
-            metric_outputs_v2[metric].append(metric_output[metric])
+            metric_outputs[metric].append(metric_output[metric])
              
         samples_table += build_wandb_table_row(
             beams, decoded_labels, decoded_inputs, scores,
@@ -185,12 +185,12 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     wandb_table = wandb.Table(columns=columns, data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
-    results = {}
-    for (metric_name, metric_data) in metric_outputs_v2.items():
-        results[metric_name] = np.mean(metric_data)
+    mean_metric_outputs = {}
+    for (metric_name, metric_data) in metric_outputs.items():
+        mean_metric_outputs[metric_name] = np.mean(metric_data)
 
-    print({prefix: results})
-    wandb.log({prefix: results})
+    print({prefix: mean_metric_outputs})
+    wandb.log({prefix: mean_metric_outputs})
 
     all_scores = np.array(all_scores)
     try:
@@ -204,4 +204,4 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     plots.plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
 
-    return results
+    return mean_metric_outputs

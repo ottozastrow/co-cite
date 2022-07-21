@@ -74,7 +74,6 @@ class KerasMetricCallback(Callback):
     """
     def __init__(
         self,
-        metric_fn: Callable,
         eval_dataset: Union[tf.data.Dataset, np.ndarray, tf.Tensor, tuple, dict],
         tokenizer,
         model,
@@ -88,7 +87,6 @@ class KerasMetricCallback(Callback):
     ):
         super().__init__()
         self.step_num = 1
-        self.metric_fn = metric_fn
         self.model = model
         self.tokenizer = tokenizer
         self.batch_size = batch_size
@@ -196,7 +194,7 @@ class KerasMetricCallback(Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         train_helpers.evaluate(
-            self.model, self.eval_dataset, self.metric_fn,
+            self.model, self.eval_dataset,
             prefix=self.prefix, args=self.args, top_ks=self.top_ks,
             tokenizer=self.tokenizer)
 
