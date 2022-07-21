@@ -59,7 +59,7 @@ def test_acc_metric():
         inputs = batch["input_ids"]
         labels = batch["labels"]
 
-        fn = CustomMetrics(prefix="test_", args=args).fast_metrics
+        fn = CustomMetrics(args=args).fast_metrics
         to_tupledict = lambda x, y: ({"sequences":x}, y)
 
         metrics, matches_at_k = fn(to_tupledict(labels, labels))

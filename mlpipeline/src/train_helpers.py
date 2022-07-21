@@ -4,6 +4,7 @@ import time
 import matplotlib.pyplot as plt
 
 import numpy as np
+from tables import Unknown
 import tensorflow as tf
 import tqdm
 import wandb
@@ -14,16 +15,22 @@ import plots
 import csv
 
 
-def rearrange_model_generate(predictions, args):
+def rearrange_model_generate(predictions, args) -> list:
     # annoying reformatting because of transformers.model.generate output is flattened (batchsize x beams)
-    beams = [[] for i in range(args.topk)]
-    assert len(predictions) == args.topk * args.batchsize,\
-        "assuming this format as output from generate()" + str(len(predictions))
-    # assuming predictions is batchsize x beam_num x tokens
-    for i in range(args.batchsize):
-        for j in range(args.topk):
-            beams[j].append(predictions[i*args.topk + j])
-    return beams
+    if args.topk != 1:
+        beams: list = [[] for i in range(args.topk)]
+        assert len(predictions) == args.topk * args.batchsize,\
+            f"assuming this format as output from generate() {len(predictions)} {args.batchsize} {args.topk}"
+        for i in range(args.topk):
+            beams[i] = predictions[i::args.topk]
+        # predictions = beams
+        # assuming predictions is batchsize x beam_num x tokens
+        # for i in range(args.batchsize):
+        #     for j in range(args.topk):
+        #         beams[j].append(predictions[i*args.topk + j])
+        return beams
+    else:
+        return [predictions]
 
 
 def tokens_2_words(tokenizer, predictions, labels, inputs=None):
@@ -56,9 +63,9 @@ def generate_batch(model, inputs, args):
 
 
     if args.topk != 1:
-        beams = rearrange_model_generate(predictions, args)
         scores = list(scores.numpy())
         scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
+
     else:
         # when args.topk == 1, predictions is a tuple of logits (tensor)
         # of shape seqlen x batchsize x vocabsize
@@ -69,10 +76,10 @@ def generate_batch(model, inputs, args):
 
         scores = mean_probabilites.numpy().tolist()
 
-        beams = [predictions]
+        predictions = [predictions]
     
 
-    return beams, scores, latency
+    return predictions, scores, latency
 
 
 def load_occurrences(args):
@@ -81,6 +88,7 @@ def load_occurrences(args):
         reader = csv.reader(f)
         occurences_map = {rows[0]: int(rows[1]) for rows in reader}
     print("loaded occurences. found ", len(occurences_map), " entries")
+    return occurences_map
 
 
 def match_occurrences(decoded_labels, occurrence_map):
@@ -91,6 +99,7 @@ def match_occurrences(decoded_labels, occurrence_map):
         else:
             print("didn't find label in occurences_map: ", label)
             occurrences.append(None)
+    return occurrences
 
 
 def build_wandb_table_row(
@@ -131,12 +140,15 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
     
     for batch in tqdm.tqdm(dataset):
-        beams, scores, latency = generate_batch(model, batch["inputs"], args)
+        predictions, scores, latency = generate_batch(model, batch["input_ids"], args)
 
         decoding_latencies.append(latency)
-        decoded_labels, beams, decoded_inputs = tokens_2_words(
-            tokenizer,beams, batch["labels"], batch["inputs"])
-        
+
+        decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(
+            tokenizer, predictions, batch["labels"], batch["input_ids"])
+
+        beams = rearrange_model_generate(decoded_predictions, args)
+
         metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
         all_scores += scores
 

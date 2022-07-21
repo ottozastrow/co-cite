@@ -56,12 +56,11 @@ def batch_accuracy(predictions, labels):
 
 
 class CustomMetrics():
-    def __init__(self, prefix, args, top_ks):
-        self.prefix = prefix
+    def __init__(self, args, top_ks):
         self.args = args
         self.top_ks = top_ks
 
-    def fast_metrics(self, beams, labels, several_beams=False) -> dict:
+    def fast_metrics(self, beams, labels, several_beams=False) -> tuple[dict, dict]:
         """
         tupledict is a tuple of (dict(list()), list())
         its counterintuitive but I'll keep it since the huggingface
@@ -97,7 +96,7 @@ class CustomMetrics():
 
             matches[k] = matches_topk
             topk_acc = np.mean(matches_topk)
-            results[self.prefix + "top{}_acc".format(k)] = topk_acc
+            results[f"top{k}_acc"] = topk_acc
 
         top1matches = list(match_at_k[0])
 

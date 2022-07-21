@@ -92,8 +92,8 @@ def main():
     top_ks = [k for k in top_ks if k <= max_k]
 
     ### build callbacks
-    metric_fn_test = CustomMetrics(prefix="test_", args=args, top_ks=top_ks).fast_metrics
-    metric_fn_train = CustomMetrics(prefix="train_", args=args, top_ks=top_ks).fast_metrics
+    metric_fn_test = CustomMetrics(args=args, top_ks=top_ks).fast_metrics
+    metric_fn_train = CustomMetrics(args=args, top_ks=top_ks).fast_metrics
     metric_test_callback = callbacks.KerasMetricCallback(
         model=model,
         tokenizer=tokenizer,
