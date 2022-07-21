@@ -10,7 +10,7 @@ from datasets import disable_caching
 from transformers import AutoTokenizer
 
 from citation_normalization import normalize_citation, update_tokenizer
-import parse_retrieval_data
+import retrieval.parse_retrieval_data as parse_retrieval_data
 
 disable_caching()
 
