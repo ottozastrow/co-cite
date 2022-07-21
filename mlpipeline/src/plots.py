@@ -5,41 +5,45 @@ import numpy as np
 import wandb
 
 
-def plot_precision_recall(matches, scores, top_ks, buckets=40):
-    # find threshold such that scores is split into equal buckets
-    scores_sorted = np.sort(scores)
-    scores_sorted = scores_sorted[::-1]
-    # thresholds are periodically taken across sorted scores
-    thresholds = [scores_sorted[(len(scores) // buckets) * i]
-                  for i in range(buckets)]
+def plot_precision_recall(prefix, matches, scores, top_ks, buckets=40) -> None:
+    try:
+        # find threshold such that scores is split into equal buckets
+        scores_sorted = np.sort(scores)
+        scores_sorted = scores_sorted[::-1]
+        # thresholds are periodically taken across sorted scores
+        thresholds = [scores_sorted[(len(scores) // buckets) * i]
+                    for i in range(buckets)]
 
-    for k in top_ks:
-        # for every threshold, compute the precision
-        precisions = []
-        for threshold in thresholds:
-            # compute the number of true positives
-            true_positives = np.sum(matches[k] & (scores >= threshold))
-            # compute the number of false positives
-            false_positives = np.sum(np.logical_not(
-                matches[k]) & (scores >= threshold))
-            # compute the precision
-            precision = true_positives / (true_positives + false_positives)
-            # append the precision to the list of precisions
-            precisions.append(precision)
+        for k in top_ks:
+            # for every threshold, compute the precision
+            precisions = []
+            for threshold in thresholds:
+                # compute the number of true positives
+                true_positives = np.sum(matches[k] & (scores >= threshold))
+                # compute the number of false positives
+                false_positives = np.sum(np.logical_not(
+                    matches[k]) & (scores >= threshold))
+                # compute the precision
+                precision = true_positives / (true_positives + false_positives)
+                # append the precision to the list of precisions
+                precisions.append(precision)
 
-        # plot curve
-        # plt.legend(["top " + str(k)])
-        plt.plot([i/buckets for i in range(buckets)], precisions, label="top " + str(k))
-        # plot with legend
-        # yaxsis, xaxis, title
-    plt.xlabel('recall')
-    plt.ylabel('Precision')
-    plt.title('Precision-Recall Curve')
+            # plot curve
+            # plt.legend(["top " + str(k)])
+            plt.plot([i/buckets for i in range(buckets)], precisions, label="top " + str(k))
+            # plot with legend
+            # yaxsis, xaxis, title
+        plt.xlabel('recall')
+        plt.ylabel('Precision')
+        plt.title('Precision-Recall Curve')
 
-    return plt
+        wandb.log({prefix + "_precision_recall": plt})
+
+    except Exception as e:
+        print("WARNING: exception in plot precision recall:", e)
 
 
-def plot_accs_per_occurrence(df, columns):
+def plot_accs_per_occurrence(df, columns) -> None:
     df = df.sort_values(by="label_occurrences", ascending=False)
     # show average of new_segment_acc per quantile occurences
     # compute average of segment_acc over 10 buckets of label_occurrences

@@ -14,7 +14,9 @@ import csv
 
 
 def rearrange_model_generate(predictions, args) -> list:
-    # annoying reformatting because of transformers.model.generate output is flattened (batchsize x beams)
+    """
+    annoying reformatting because of transformers.model.generate output is flattened (batchsize x beams)
+    """
     if args.topk != 1:
         beams: list = [[] for i in range(args.topk)]
         assert len(predictions) == args.topk * args.batchsize,\
@@ -32,6 +34,7 @@ def rearrange_model_generate(predictions, args) -> list:
 
 
 def tokens_2_words(tokenizer, predictions, labels, inputs=None):
+    """Use tokenizer to tokenize predictions, labels and inputs."""
     predictions = np.where(predictions != -100, predictions, tokenizer.pad_token_id)
     decoded_predictions = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
@@ -43,6 +46,7 @@ def tokens_2_words(tokenizer, predictions, labels, inputs=None):
 
 
 def generate_batch(model, inputs, args):
+    """Runs model.generate on a batch of inputs."""
     # timeit
     start = time.time()
     # generate predictions
@@ -81,6 +85,8 @@ def generate_batch(model, inputs, args):
 
 
 def load_occurrences(args):
+    """The citation occurrence count is computed while the dataset is generated.
+    Load it as preparation for match_occurrences here."""
     # load occurences dict from csv args.data_dir/occurrences.csv
     with open(args.parquet_data_dir_name + "/occurrences.csv", "r") as f:
         reader = csv.reader(f)
@@ -90,6 +96,7 @@ def load_occurrences(args):
 
 
 def match_occurrences(decoded_labels, occurrence_map):
+    """For a given label, find the number of occurrences in the dataset."""
     occurrences = []
     for label in decoded_labels:
         if label in occurrence_map.keys():
@@ -104,7 +111,7 @@ def build_wandb_table_row(
         beams, decoded_labels, decoded_inputs, scores,
         occurrences, mean_segment_accs, matches):
     ### results table for wandb
-        # change dim ordering of list of lists
+    # change dim ordering of list of lists
     beams_reorderd = [list(i) for i in zip(*beams)]
     columns_list = [
         decoded_inputs, beams[0], decoded_labels, occurrences,
@@ -117,6 +124,10 @@ def build_wandb_table_row(
 
 
 def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
+    """Calls all metrics for this model and dataset.
+    Results are logged in wandb.
+    """
+
     print("starting eval" + prefix)
     samples_table = []
 
@@ -135,6 +146,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     for batch in tqdm.tqdm(dataset):
         predictions, scores, latency = generate_batch(model, batch["input_ids"], args)
         metric_outputs["latency"].append(latency)
+        all_scores += scores
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(
             tokenizer, predictions, batch["labels"], batch["input_ids"])
@@ -142,17 +154,14 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
         beams = rearrange_model_generate(decoded_predictions, args)
 
         metric_output, matches = metrics.matches_at_k(beams, decoded_labels, top_ks=top_ks, several_beams=True)
-        all_scores += scores
-        
-        occurrences = match_occurrences(decoded_labels, occurences_map)
-
         # add matches dict to all matches
         for k in list(matches.keys()):
             all_matches[k].extend(matches[k])
-
-        mean_segment_accs = []
+        
+        occurrences = match_occurrences(decoded_labels, occurences_map)
 
         ### segment accuracy metrics
+        mean_segment_accs = []
         # iterate over elements in batches
         for i in range(len(decoded_labels)):
             metric_outputs["segment_accs_no_subsections"].extend(
@@ -193,15 +202,9 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     wandb.log({prefix: mean_metric_outputs})
 
     all_scores = np.array(all_scores)
-    try:
-        plot = plots.plot_precision_recall(all_matches, all_scores, top_ks=top_ks)
-        wandb.log({prefix + "_precision_recall": plot})
-
-    except Exception as e:
-        print("WARNING: exception in plot precision recall:", e)
+    plots.plot_precision_recall(prefix, all_matches, all_scores, top_ks=top_ks)
 
     table = pd.DataFrame(samples_table, columns=columns)
-
     plots.plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
 
     return mean_metric_outputs

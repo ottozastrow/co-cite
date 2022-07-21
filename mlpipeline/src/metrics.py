@@ -44,17 +44,6 @@ def citation_segment_acc(
     return accs
 
 
-def batch_accuracy(predictions, labels):
-    """Computes sequence wise accuracy.
-    Args:
-        predictions: predictions of shape (batch_size, sequence_length)
-        labels: labels of shape (batch_size, sequence_length)
-    Returns:
-        accuracy: average accuracy of the predictions"""
-
-    return np.mean([pred == label for pred, label in list(zip(predictions, labels))])
-
-
 def matches_at_k(beams, labels, top_ks, several_beams=False) -> tuple[dict, dict]:
     """
     tupledict is a tuple of (dict(list()), list())
