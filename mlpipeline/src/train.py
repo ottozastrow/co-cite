@@ -139,13 +139,13 @@ def main():
     ### evaluate model
     if not args.noevaluation:
         train_helpers.evaluate(
-            model, generation_train_dataset,
+            model, generation_test_dataset,
             prefix="test_", args=args,
             top_ks=top_ks, tokenizer=tokenizer)
-        # train_helpers.evaluate(
-        #     model, generation_train_dataset,
-        #     prefix="train_", args=args,
-        #     top_ks=top_ks, tokenizer=tokenizer)
+        train_helpers.evaluate(
+            model, generation_train_dataset,
+            prefix="train_", args=args,
+            top_ks=top_ks, tokenizer=tokenizer)
 
 if __name__ == "__main__":
     main()
