@@ -29,8 +29,6 @@ def cmd_arguments(debug=False, testargs=None):
                         help="use model.predict instead of model.generate. is 6x faster. doesnt support beamsearch or sampling",
                         action="store_true")  # Depprecated
     parser.add_argument("--temperature", help="for sample decoding", type=int, default=0.7)
-    # eval_batchsize
-    parser.add_argument("--eval_batchsize", type=int, help="batch size for evaluation", default=1)
 
     ## dataset arguments
     parser.add_argument("--input_tokens", type=int, help="input token length", default=256)
@@ -65,6 +63,8 @@ def cmd_arguments(debug=False, testargs=None):
 
     if args.tokenizer == "":
         args.tokenizer = args.modelname
+    
+    args.eval_batchsize = args.batchsize * 4
 
     args.diffsearchindex_output_tokens += args.output_tokens
 
