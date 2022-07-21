@@ -44,7 +44,7 @@ def generate_batch(model, inputs, args):
     start = time.time()
     # generate predictions
     modeloutdict = model.generate(
-        inputs, num_beams=args.topk,
+        inputs, num_beams=args.topk, use_cache=True,
         num_return_sequences=args.topk,
         do_sample=args.sample_decoding, top_k=args.topk, early_stopping=True,
         output_scores=True, return_dict_in_generate=True, max_length=args.output_tokens)
