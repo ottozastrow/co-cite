@@ -14,8 +14,8 @@ memory: 22800
 minutes: 100
 same:
   batchsize: 8
-  modelname: "t5-base"
-  tags: 'latency_test_v11'
+  modelname: "facebook/bart-large"
+  tags: 'latency_test_v11_bart'
   samples: '1000'
 same_flags:
   - notraining

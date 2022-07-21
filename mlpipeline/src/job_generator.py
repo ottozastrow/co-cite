@@ -5,7 +5,7 @@ import yaml
 import argparse
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--config_yaml", type=str, help="yaml file containing config", default='launch_configs/debug.yaml')
+parser.add_argument("--config", type=str, help="yaml file containing config", default='launch_configs/debug.yaml')
 parser.add_argument("--only", help="of all configs in this file only run number 1,2 ", type=str, default=None)
 args = parser.parse_args()
 
