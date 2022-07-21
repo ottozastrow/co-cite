@@ -138,7 +138,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     
     for batch in tqdm.tqdm(dataset):
         predictions, scores, latency = generate_batch(model, batch["input_ids"], args)
-        metric_outputs["latency"].append(latency)
+        metric_outputs["latency"].append(latency / args.eval_batchsize)
         all_scores += scores
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(
