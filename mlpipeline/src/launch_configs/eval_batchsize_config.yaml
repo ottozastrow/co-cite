@@ -9,7 +9,7 @@ different:
   - 8
   - 32
   - 64
-
+different_flags: {}
 memory: 22800
 minutes: 100
 same:
