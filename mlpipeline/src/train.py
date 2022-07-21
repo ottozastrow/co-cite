@@ -75,7 +75,7 @@ def main():
         .shuffle(seed=42)
         .select(list(range(num_demo_samples)))
         .to_tf_dataset(
-            batch_size=args.batchsize,
+            batch_size=args.eval_batchsize,
             drop_remainder=True,
             columns=["input_ids", "attention_mask", "labels", "label_occurrences"],
             shuffle=False,
@@ -139,13 +139,13 @@ def main():
     ### evaluate model
     if not args.noevaluation:
         train_helpers.evaluate(
-            model, tf_test_set,
+            model, generation_train_dataset,
             prefix="test_", args=args,
             top_ks=top_ks, tokenizer=tokenizer)
-        train_helpers.evaluate(
-            model, generation_train_dataset,
-            prefix="train_", args=args,
-            top_ks=top_ks, tokenizer=tokenizer)
+        # train_helpers.evaluate(
+        #     model, generation_train_dataset,
+        #     prefix="train_", args=args,
+        #     top_ks=top_ks, tokenizer=tokenizer)
 
 if __name__ == "__main__":
     main()
