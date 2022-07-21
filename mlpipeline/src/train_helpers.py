@@ -1,10 +1,8 @@
 
 import time
-
-import matplotlib.pyplot as plt
+import collections
 
 import numpy as np
-from tables import Unknown
 import tensorflow as tf
 import tqdm
 import wandb
@@ -122,10 +120,6 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     print("starting eval" + prefix)
     samples_table = []
 
-    metric_outputs = []
-    segment_accs = []  # a given target may contain several segments.
-    segment_accs_no_subsections = []
-    # here accuracy is computed for each segment
     # if top_ks isnatnce of tuple
     if isinstance(top_ks, tuple):
         top_ks = top_ks[0]  # unexplainable bug causes this
@@ -135,14 +129,12 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     
     occurences_map = load_occurrences(args)
 
-    decoding_latencies = []
     all_scores = []
-
+    metric_outputs_v2 = collections.defaultdict(list)
     
     for batch in tqdm.tqdm(dataset):
         predictions, scores, latency = generate_batch(model, batch["input_ids"], args)
-
-        decoding_latencies.append(latency)
+        metric_outputs_v2["latency"].append(latency)
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(
             tokenizer, predictions, batch["labels"], batch["input_ids"])
@@ -151,7 +143,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
 
         metric_output, matches = metric_fn(beams, decoded_labels, several_beams=True)
         all_scores += scores
-
+        
         occurrences = match_occurrences(decoded_labels, occurences_map)
 
         # add matches dict to all matches
@@ -163,7 +155,7 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
         ### segment accuracy metrics
         # iterate over elements in batches
         for i in range(len(decoded_labels)):
-            segment_accs_no_subsections.extend(
+            metric_outputs_v2["segment_accs_no_subsections"].extend(
                 metrics.citation_segment_acc(
                     beams[0][i], decoded_labels[i],
                     remove_subsections=True, remove_subsubsections=True,
@@ -174,10 +166,13 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
             segment_acc = metrics.citation_segment_acc(
                 beams[0][i], decoded_labels[i], args=args,
                 remove_subsections=False, remove_subsubsections=True)
-            segment_accs.extend(segment_acc)
+            metric_outputs_v2["segment_accs"].extend(segment_acc)
+            
             mean_segment_accs.append(np.mean(segment_acc))
+            metric_outputs_v2["mean_segment_accs"].append(np.mean(segment_acc))
 
-        metric_outputs.append(metric_output)
+        for metric in metric_output.keys():
+            metric_outputs_v2[metric].append(metric_output[metric])
              
         samples_table += build_wandb_table_row(
             beams, decoded_labels, decoded_inputs, scores,
@@ -190,12 +185,10 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     wandb_table = wandb.Table(columns=columns, data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
-    # log avg decoding latency to wandb
-    wandb.log({prefix + "eval_batch_decoding_latency": np.mean(decoding_latencies)})
+    results = {}
+    for (metric_name, metric_data) in metric_outputs_v2.items():
+        results[metric_name] = np.mean(metric_data)
 
-    results = mean_over_metrics_batches(metric_outputs)
-    results["segment_acc"] = np.mean(segment_accs)
-    results["segment_acc_no_subsections"] = np.mean(segment_accs_no_subsections)
     print({prefix: results})
     wandb.log({prefix: results})
 
@@ -212,16 +205,3 @@ def evaluate(model, dataset, metric_fn, prefix, args, top_ks, tokenizer):
     plots.plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
 
     return results
-
-
-def mean_over_metrics_batches(batchwise_metrics):
-    # iterate through keys and items in metric_outputs and compute mean
-    # create numpy array from list of dicts
-    keys_list = list(batchwise_metrics[0].keys())
-    metric_outputs = {}
-    for key in keys_list:
-        values = []
-        for batch in batchwise_metrics:
-            values.append(batch[key])
-        metric_outputs[key] = np.mean(values)
-    return metric_outputs
