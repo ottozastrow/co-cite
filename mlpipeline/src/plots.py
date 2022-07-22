@@ -37,13 +37,13 @@ def plot_precision_recall(prefix, matches, scores, top_ks, buckets=40) -> None:
         plt.ylabel('Precision')
         plt.title('Precision-Recall Curve')
 
-        wandb.log({prefix + "_precision_recall": plt})
+        wandb.log({prefix: {"precision_recall": plt}})
 
     except Exception as e:
         print("WARNING: exception in plot precision recall:", e)
 
 
-def plot_accs_per_occurrence(df, columns) -> None:
+def plot_accs_per_occurrence(prefix, df, columns) -> None:
     df = df.sort_values(by="label_occurrences", ascending=False)
     # show average of new_segment_acc per quantile occurences
     # compute average of segment_acc over 10 buckets of label_occurrences
@@ -74,8 +74,11 @@ def plot_accs_per_occurrence(df, columns) -> None:
             x=x_titles,
             y=list(quantiles[column]))
 
-    # fig.update_layout(barmode='stack')
-    # fig.update_layout(barmode="relative")
+    # compute acc over rarest 20%
+    for column in columns:
+        rarest_fith = np.mean(quantiles[column][:num_buckets//5])
+        wandb.log({prefix: {column + "_rarest_20%": rarest_fith}})
+
     fig.update_layout(title_text="Average Segment Accuracy per Quantile Occurrences")
 
     # x axis = occurrence range
@@ -83,4 +86,4 @@ def plot_accs_per_occurrence(df, columns) -> None:
     # y axis = average segment accuracy
     fig.update_yaxes(title_text="Average Segment Accuracy")
     # fig.show()
-    wandb.log({"avg_segment_acc_per_quantile": fig})
+    wandb.log({prefix: {"avg_segment_acc_per_quantile": fig}})

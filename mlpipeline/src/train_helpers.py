@@ -196,6 +196,6 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     all_scores = np.array(all_scores)
     plots.plot_precision_recall(prefix, all_matches, all_scores, top_ks=top_ks)
     table = pd.DataFrame(samples_table, columns=columns)
-    plots.plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
+    plots.plot_accs_per_occurrence(prefix, table, columns=["segment_acc"] + topk_keys)
 
     return mean_metric_outputs
