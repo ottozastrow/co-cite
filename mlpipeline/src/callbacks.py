@@ -60,12 +60,12 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
     def save_model(self, epoch):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
-        name = self.save_path + "epoch_" + str(epoch) + "_step_" + str(self.training_step * self.args.batchsize)
+        name = f"\n{self.save_path}epoch_{str/epoch}_step_{str(self.training_step * self.args.batchsize)}"
 
         wandb.log({"last_saved_model": name})
         self.model.save_pretrained(name)
         self.tokenizer.save_pretrained(name)
-        print("Saved model and toknizer to {}".format(name))
+        print(f"\nSaved model and toknizer to {name}")
 
 
 class KerasMetricCallback(Callback):
