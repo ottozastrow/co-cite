@@ -74,7 +74,7 @@ def plot_accs_per_occurrence(prefix, df, columns) -> None:
 
     # compute acc over rarest 20%
     for column in columns:
-        rarest_fith = np.mean(quantiles[column][:num_buckets//5])
+        rarest_fith = np.mean(quantiles[column][-num_buckets//5:])
         wandb.log({prefix: {column + "_rarest_20%": rarest_fith}})
 
     fig.update_layout(title_text="Average Segment Accuracy per Quantile Occurrences")
