@@ -63,7 +63,6 @@ def cmd_arguments(debug=False, testargs=None):
 
     if args.tokenizer == "":
         args.tokenizer = args.modelname
-    
 
     args.diffsearchindex_output_tokens += args.output_tokens
 
@@ -74,6 +73,6 @@ def cmd_arguments(debug=False, testargs=None):
         args.output_tokens=2
         args.epochs=1
         # args.wandb_mode = "disabled"
-    args.eval_batchsize = args.batchsize * 4
+    args.eval_batchsize = args.batchsize * 3
     args.contextlength = args.input_tokens * 4
     return args

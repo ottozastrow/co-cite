@@ -27,6 +27,7 @@ def citation_segment_acc(
         x,
         remove_subsections=remove_subsections,
         remove_subsubsections=remove_subsubsections)
+    x = citation_normalization.segmentize_citation(x)
     y = citation_normalization.segmentize_citation(y)
     
     # compute accuracy
