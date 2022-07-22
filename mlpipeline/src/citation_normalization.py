@@ -100,20 +100,6 @@ case_categories = [
     ("Fed. Cir.", r"fed\.? ?cir\.?"),
 ]
 
-def update_tokenizer(tokenizer):
-    """
-    updates the tokenizer with common tokens for statutes and cases
-    """
-    new_tokens = 0
-    for (category, _) in case_categories:
-        new_tokens = tokenizer.add_tokens([" " + category])
-    statute_tokens = ["38 U.S.C.A. §", "38 C.F.R. §", "§"]
-    new_tokens += tokenizer.add_tokens(statute_tokens)
-    if new_tokens > 0:
-        print(f"added {new_tokens} tokens to tokenizer")
-
-    return tokenizer
-
 
 def normalize_case(inputs_orig):
     """

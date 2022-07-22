@@ -1,7 +1,7 @@
 
 from codecarbon import EmissionsTracker
 from transformers import DataCollatorForSeq2Seq, \
-    TFAutoModelForSeq2SeqLM, AdamWeightDecay
+    TFAutoModelForSeq2SeqLM, AdamWeightDecay, AutoTokenizer
 import wandb
 from wandb.keras import WandbCallback
 
@@ -10,6 +10,25 @@ import train_helpers
 import callbacks
 from config import cmd_arguments
 from callbacks import SaveModelCallback
+from citation_normalization import case_categories
+
+
+def update_tokenizer(tokenizer, args):
+    """
+    updates the tokenizer with common tokens for statutes and cases
+    """
+    if args.dont_normalize_citations:
+        # raise not supported error
+        # tokenizer add_tokens([§]) update assumes normalization 
+        raise NotImplementedError("normalization of citations is not supported yet. tokenizer add_tokens([§]) update assumes normalization ")
+    else:
+        new_tokens = 0
+        for (category, _) in case_categories:
+            new_tokens = tokenizer.add_tokens([" " + category])
+        statute_tokens = ["38 U.S.C.A. §", "38 C.F.R. §", "§"]
+        new_tokens += tokenizer.add_tokens(statute_tokens)
+        if new_tokens > 0:
+            print(f"added {new_tokens} tokens to tokenizer")
 
 
 def main():
@@ -22,7 +41,13 @@ def main():
 
     # TODO make from_pytorch dynamic. if tensorflow model or hub model set to false. else True.
     model = TFAutoModelForSeq2SeqLM.from_pretrained(args.modelname, from_pt=args.from_pytorch)
-    tokenized_datasets, tokenizer = cocitedata.load_dataset(args)
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+    old_len = len(tokenizer)
+    update_tokenizer(tokenizer, args)
+    model.resize_token_embeddings(len(tokenizer))
+    print(f"tokenizer length: {len(tokenizer)} and was {old_len}")
+
+    tokenized_datasets = cocitedata.load_dataset(args, tokenizer)
 
     ### build datasets
     data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model, return_tensors="tf")

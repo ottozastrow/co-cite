@@ -56,7 +56,6 @@ def generate_batch(model, inputs, args):
     scores = modeloutdict["scores"]
     predictions = modeloutdict["sequences"]
 
-
     if args.topk != 1:
         scores = list(scores.numpy())
         scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
@@ -72,7 +71,6 @@ def generate_batch(model, inputs, args):
         scores = mean_probabilites.numpy().tolist()
 
         predictions = [predictions]
-    
 
     return predictions, scores, latency
 
@@ -122,6 +120,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     """
 
     print("starting eval" + prefix)
+    
     samples_table = []
 
     # if top_ks isnatnce of tuple
@@ -177,8 +176,8 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
             metric_outputs[metric].append(metric_output[metric])
              
         samples_table += build_wandb_table_row(
-            beams, decoded_labels, decoded_inputs, scores,
-            occurrences, mean_segment_accs, matches)
+            beams, decoded_labels, decoded_inputs, occurrences,
+            scores, mean_segment_accs, matches)
 
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
                "scores", "segment_acc", "all_topk_predictions"]
@@ -197,7 +196,6 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     all_scores = np.array(all_scores)
     plots.plot_precision_recall(prefix, all_matches, all_scores, top_ks=top_ks)
 
-    table = pd.DataFrame(samples_table, columns=columns)
-    plots.plot_accs_per_occurrence(table, columns=["segment_acc"] + topk_keys)
+    plots.plot_accs_per_occurrence(samples_table, columns=["segment_acc"] + topk_keys)
 
     return mean_metric_outputs

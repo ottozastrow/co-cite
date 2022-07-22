@@ -9,12 +9,12 @@ import pandas as pd
 import tqdm
 import wandb
 from datasets import disable_caching
-from transformers import AutoTokenizer
 
-from citation_normalization import normalize_citation, update_tokenizer
+from citation_normalization import case_categories, normalize_citation
 import retrieval.parse_retrieval_data as parse_retrieval_data
 
 disable_caching()
+
 
 def add_retrieval_data(data, retrieval_kb, args):
     # convert pandas dataframe data to list of dictionaries
@@ -231,7 +231,7 @@ def create_tokenize_function(tokenizer, args):
 def generate_ds_if_not_cached(data_dir_name :str, args) -> None:
     # create parquet files from raw data if not already done
     ds_exists, data_dir_name = dataset_exists(data_dir_name, args)
-    if ds_exists or args.rebuild_dataset:
+    if not ds_exists or args.rebuild_dataset:
         print("rebuilding dataset at ", data_dir_name)
         tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
         # delete tmp dir if it exists
@@ -315,12 +315,9 @@ def dataset_exists(data_dir_name: str, args) -> tuple[bool, str]:
             if int(file.split("_")[0]) <= required_input_tokens:
                 return True, halfs[0] + file
     return False, data_dir_name
-        
 
 
-def load_dataset(args):
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
-
+def load_dataset(args, tokenizer):
     # "<class 'transformers.models.t5.tokenization_t5_fast.T5TokenizerFast'>" 
     # turns the above into T5TokenizerFast
     tokenizer_name_or_path: str = str(type(tokenizer))\
@@ -349,12 +346,6 @@ def load_dataset(args):
         # TODO implement
 
     else:
-        if args.dont_normalize_citations:
-            # raise not supported error
-            # tokenizer add_tokens([§]) update assumes normalization 
-            raise NotImplementedError("normalization of citations is not supported yet. tokenizer add_tokens([§]) update assumes normalization ")
-        tokenizer = update_tokenizer(tokenizer)
-
         generate_ds_if_not_cached(data_dir_name, args)
         df = parquet_to_dataset(data_dir_name, args)
 
@@ -366,4 +357,4 @@ def load_dataset(args):
         )
         tokenized_datasets.save_to_disk(tokenized_data_dir_name)
 
-    return tokenized_datasets, tokenizer
+    return tokenized_datasets
