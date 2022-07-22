@@ -5,7 +5,7 @@ import numpy as np
 import wandb
 
 
-def plot_precision_recall(prefix, matches, scores, top_ks, buckets=40) -> None:
+def plot_precision_recall(prefix, matches, scores, top_ks, buckets=39) -> None:
     try:
         # find threshold such that scores is split into equal buckets
         scores_sorted = np.sort(scores)
@@ -13,6 +13,8 @@ def plot_precision_recall(prefix, matches, scores, top_ks, buckets=40) -> None:
         # thresholds are periodically taken across sorted scores
         thresholds = [scores_sorted[(len(scores) // buckets) * i]
                     for i in range(buckets)]
+        thresholds.append(scores_sorted[-1])
+        buckets += 1
 
         for k in top_ks:
             # for every threshold, compute the precision

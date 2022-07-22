@@ -167,7 +167,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
             segment_acc = metrics.citation_segment_acc(
                 beams[0][i], decoded_labels[i], args=args,
                 remove_subsections=False, remove_subsubsections=True)
-            metric_outputs["segment_accs"].extend(segment_acc)
+            metric_outputs["segment_acc"].extend(segment_acc)
             
             mean_segment_accs.append(np.mean(segment_acc))
             metric_outputs["mean_segment_accs"].append(np.mean(segment_acc))

@@ -73,7 +73,7 @@ def cmd_arguments(debug=False, testargs=None):
         args.input_tokens=4
         args.output_tokens=2
         args.epochs=1
-        args.wandb_mode = "disabled"
+        # args.wandb_mode = "disabled"
     args.eval_batchsize = args.batchsize * 4
     args.contextlength = args.input_tokens * 4
     return args
