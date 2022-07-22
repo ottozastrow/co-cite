@@ -57,6 +57,7 @@ def main():
     if args.debug:
         tokenized_train = tokenized_train.select(list(range(2)))
         tokenized_test = tokenized_test.select(list(range(2)))
+        args.eval_batchsize = 1
 
     training_columns = ["attention_mask", "input_ids", "labels", "label_occurrences"]
     tf_train_set = tokenized_train.to_tf_dataset(

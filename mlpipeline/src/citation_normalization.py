@@ -77,8 +77,8 @@ def sections_from_statute(
                 section = section[:-1]
             new_sections.append(section)
         sections = new_sections
-
-    assert len(sections) > 0, "no sections found in statute"
+    if len(statute_orig) > 13:  # in debug mode we may use cropped labels
+        assert len(sections) > 0, "no sections found in statute"
     # for section in sections:
         # if len(section) == 0:
         #     pass
