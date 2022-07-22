@@ -294,12 +294,17 @@ def tokenized_dataset_filepath(args, tokenizer_name_or_path="", dataset_type="")
 def dataset_exists(data_dir_name: str, args) -> tuple[bool, str]:
     """The function returns if a valid dataset exists and the filepath of the dataset.
     If no ds was found it returns False, original data_dir_name"""
+
+    ds_exists = os.path.exists(data_dir_name)
+    return ds_exists, data_dir_name
+
+    """ still awaiting implementation of cropping input_ids to args.input_tokens before this can be used"""
     required_input_tokens = args.input_tokens
     first_half = data_dir_name.split("_input_tokens")[0]
     last_half = data_dir_name.split("_input_tokens")[1]
     # regex split by integer + "_input_tokens"
-    halfs = re.split(r'(\d+)_input_tokens', first_half)
-    assert len(halfs) == 2, "regex split by integer + _input_tokens did not work"
+    halfs = re.split(r'(\d+)_input_tokens', data_dir_name)
+    assert len(halfs) == 3, "regex split by integer + _input_tokens did not work"
 
     # data_dir_name is a filepath containing r"(\d+)_input_tokens"
     # this function checks if there exists a filepath which d <= required_input_tokens
@@ -339,6 +344,9 @@ def load_dataset(args):
         print("loading tokenized dataset from", tokenized_data_dir_name)
         tokenized_datasets = datasets.load_from_disk(tokenized_data_dir_name)
         print("finished loading precomputed tokenized ds")
+        # if the tokenized dataset is reused from a previous run, the input_token_length may be wrong.
+        # crop the dataset["input_ids"] to args.input_tokens
+        # TODO implement
 
     else:
         if args.dont_normalize_citations:
