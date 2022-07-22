@@ -1,6 +1,8 @@
 # imports
 import os
 import shutil
+import re
+
 
 import datasets
 import pandas as pd
@@ -228,7 +230,9 @@ def create_tokenize_function(tokenizer, args):
 
 def generate_ds_if_not_cached(data_dir_name :str, args) -> None:
     # create parquet files from raw data if not already done
-    if not os.path.exists(data_dir_name) or args.rebuild_dataset:
+    ds_exists, data_dir_name = dataset_exists(data_dir_name, args)
+    if ds_exists or args.rebuild_dataset:
+        print("rebuilding dataset at ", data_dir_name)
         tmp_dir_name = data_dir_name[:-1] + "_unfinished/"
         # delete tmp dir if it exists
         if os.path.exists(tmp_dir_name):
@@ -287,15 +291,41 @@ def tokenized_dataset_filepath(args, tokenizer_name_or_path="", dataset_type="")
     return data_dir_name
 
 
+def dataset_exists(data_dir_name: str, args) -> tuple[bool, str]:
+    """The function returns if a valid dataset exists and the filepath of the dataset.
+    If no ds was found it returns False, original data_dir_name"""
+    required_input_tokens = args.input_tokens
+    first_half = data_dir_name.split("_input_tokens")[0]
+    last_half = data_dir_name.split("_input_tokens")[1]
+    # regex split by integer + "_input_tokens"
+    halfs = re.split(r'(\d+)_input_tokens', first_half)
+    assert len(halfs) == 2, "regex split by integer + _input_tokens did not work"
+
+    # data_dir_name is a filepath containing r"(\d+)_input_tokens"
+    # this function checks if there exists a filepath which d <= required_input_tokens
+    # and has the same last half as data_dir_name
+    files = os.listdir(halfs[0])
+    for file in files:
+        if file.endswith(last_half):
+            if int(file.split("_")[0]) <= required_input_tokens:
+                return True, halfs[0] + file
+    return False, data_dir_name
+        
+
+
 def load_dataset(args):
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
 
     # "<class 'transformers.models.t5.tokenization_t5_fast.T5TokenizerFast'>" 
     # turns the above into T5TokenizerFast
-    tokenizer_name_or_path: str = str(type(tokenizer)).split(".")[-1].replace("'>", "")
+    tokenizer_name_or_path: str = str(type(tokenizer))\
+        .split(".")[-1].replace("'>", "")
 
     data_dir_name = raw_dataset_filepath(args, tokenizer_name_or_path)
     tokenized_data_dir_name = tokenized_dataset_filepath(args, tokenizer_name_or_path)
+
+    ds_exists, tokenized_data_dir_name = dataset_exists(
+        tokenized_data_dir_name, args)
 
     args.parquet_data_dir_name = data_dir_name
 
@@ -303,18 +333,20 @@ def load_dataset(args):
         "data_dir_name": data_dir_name,
         "tokenized_data_dir_name": tokenized_data_dir_name
     })
-
+    
     # if tokenized dataset exists load it
-    if os.path.exists(tokenized_data_dir_name) and not args.rebuild_dataset:
+    if ds_exists and not args.rebuild_dataset:
         print("loading tokenized dataset from", tokenized_data_dir_name)
         tokenized_datasets = datasets.load_from_disk(tokenized_data_dir_name)
         print("finished loading precomputed tokenized ds")
 
     else:
-        assert args.dont_normalize_citations == False, "tokenizer update assumes normalization"
+        if args.dont_normalize_citations:
+            # raise not supported error
+            # tokenizer add_tokens([§]) update assumes normalization 
+            raise NotImplementedError("normalization of citations is not supported yet. tokenizer add_tokens([§]) update assumes normalization ")
         tokenizer = update_tokenizer(tokenizer)
 
-        print("rebuilding dataset at ", tokenized_data_dir_name)
         generate_ds_if_not_cached(data_dir_name, args)
         df = parquet_to_dataset(data_dir_name, args)
 
