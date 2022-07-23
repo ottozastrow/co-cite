@@ -94,7 +94,7 @@ def print_metrics(mrr, k_list):
 def train_dpr(retriever, args):
     #train_filename = "train/biencoder-nq-train.json"
     test_filename = "test_dpr_dataset.json"
-    train_filename = "test_dpr_dataset.json"
+    train_filename = "train_dpr_dataset.json"
     # WARNING: both are set to same file for debugging
 
     doc_dir = f"../../data/retrieval/{args.retriever}/v1/"
@@ -114,7 +114,7 @@ def train_dpr(retriever, args):
         save_dir=save_dir,
         evaluate_every=3000,
         embed_title=False,
-        num_positives=10,
+        num_positives=4,
         num_hard_negatives=10,
     )
     return retriever
@@ -155,12 +155,13 @@ def main():
     elif args.retriever == "dpr":
         retriever = DensePassageRetriever(
             document_store=document_store,
-            # query_embedding_model = "t5-small",
-            # passage_embedding_model = "t5-small",
+            # query_embedding_model = "nlpaueb/legal-bert-small-uncased",
+            # passage_embedding_model = "nlpaueb/legal-bert-small-uncased",
             query_embedding_model="facebook/dpr-question_encoder-single-nq-base",
             passage_embedding_model="facebook/dpr-ctx_encoder-single-nq-base",
-            # max_seq_len_query=8,
-            # max_seq_len_passage=8,
+            max_seq_len_query=args.input_tokens,
+            max_seq_len_passage=args.input_tokens,
+            infer_tokenizer_classes=True,
             use_gpu=True,
             embed_title=False,
             batch_size=args.batchsize,

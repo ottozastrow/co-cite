@@ -151,7 +151,7 @@ def build_dpr(args):
     data_utils.load_retrieval_dataset(args)
     args.num_negatives = 10
     max_contexts_per_citation = 500
-    args.minimum_positives = 2
+    args.minimum_positives = 3
     # wandb.init(project="cocite", tags=["DPR"], config=args, mode=args.wandb_mode)
     # tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
     # # TODO  call update_tokenizer(args) and model.resize_token_embeddings(len(tokenizer))
