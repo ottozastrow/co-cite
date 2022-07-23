@@ -114,7 +114,7 @@ def train_dpr(retriever, args):
         batch_size=args.batchsize,
         grad_acc_steps=4,
         save_dir=save_dir,
-        evaluate_every=3000,
+        evaluate_every=7000,
         embed_title=False,
         num_positives=1,
         num_hard_negatives=10,
