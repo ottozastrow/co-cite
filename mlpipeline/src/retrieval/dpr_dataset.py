@@ -137,7 +137,7 @@ def dpr_dataset_from_citation_pairs(index, preprocessor, args):
     # drop all samples with less than 2 positive contexts (especially since one is the identity mapping)
     filtered_dpr_dataset = [
         sample for sample in dpr_dataset
-        if len(sample["positive_ctxs"]) > args.minimum_positives
+        if len(sample["positive_ctxs"]) >= args.minimum_positives
     ]
     
     # add negatives
@@ -150,8 +150,8 @@ def dpr_dataset_from_citation_pairs(index, preprocessor, args):
 def build_dpr(args):
     data_utils.load_retrieval_dataset(args)
     args.num_negatives = 10
-    max_contexts_per_citation = 500
-    args.minimum_positives = 3
+    args.minimum_positives = 4
+    max_contexts_per_citation = args.minimum_positives
     # wandb.init(project="cocite", tags=["DPR"], config=args, mode=args.wandb_mode)
     # tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
     # # TODO  call update_tokenizer(args) and model.resize_token_embeddings(len(tokenizer))

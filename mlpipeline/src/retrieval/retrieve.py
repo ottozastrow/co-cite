@@ -93,7 +93,7 @@ def print_metrics(mrr, k_list):
 
 def train_dpr(retriever, args):
     #train_filename = "train/biencoder-nq-train.json"
-    test_filename = "test_dpr_dataset.json"
+    test_filename = "train_dpr_dataset.json"
     train_filename = "train_dpr_dataset.json"
     # WARNING: both are set to same file for debugging
 
@@ -114,7 +114,7 @@ def train_dpr(retriever, args):
         save_dir=save_dir,
         evaluate_every=3000,
         embed_title=False,
-        num_positives=4,
+        num_positives=1,
         num_hard_negatives=10,
     )
     return retriever
