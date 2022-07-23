@@ -130,8 +130,8 @@ def main():
     wandb.init(project="cocite", tags=["retrieve"], config=args, mode=args.wandb_mode)
 
     ######## setup document store #########
-    doc_index = "document"
-    label_index = "labels"
+    doc_index = "document_v2"
+    label_index = "labels_v2"
     use_es_store = True
     if use_es_store:
         document_store = ElasticsearchDocumentStore(
