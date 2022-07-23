@@ -141,7 +141,7 @@ def main():
             index=doc_index,
             label_index=label_index,
             similarity="dot_product",
-            embedding_dim=768
+            embedding_dim=512
         )
     else:
         document_store = InMemoryDocumentStore()
