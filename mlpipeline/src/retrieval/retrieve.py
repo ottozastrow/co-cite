@@ -118,6 +118,78 @@ def train_dpr(retriever, args):
         num_hard_negatives=10,
         max_processes=16
     )
+
+
+
+    # import logging
+    # import os
+    # import pprint
+    # from pathlib import Path
+    # from farm.data_handler.data_silo import DataSilo
+    # from farm.data_handler.processor import TextSimilarityProcessor
+    # from farm.modeling.biadaptive_model import BiAdaptiveModel
+    # from farm.modeling.language_model import LanguageModel
+    # from farm.modeling.optimization import initialize_optimizer
+    # from farm.modeling.prediction_head import TextSimilarityHead
+    # from farm.modeling.tokenization import Tokenizer
+    # from farm.train import Trainer
+    # from farm.utils import set_all_seeds, MLFlowLogger, initialize_device_settings
+    # from farm.eval import Evaluator
+    # question_lang_model = "cointegrated/rubert-tiny"
+    # passage_lang_model = "cointegrated/rubert-tiny"
+    # set_all_seeds(seed=42)
+    # batch_size = args.batchsize
+    # n_epochs = 3
+    # distributed = False # enable for multi GPU training via DDP
+    # evaluate_every = 1000
+    # do_lower_case = True
+    # use_fast = True
+    # embed_title = True
+    # num_hard_negatives = 1
+    # similarity_function = "dot_product"
+    # max_samples = None # load a smaller dataset (e.g. for debugging)
+    # # 2. Create a DataProcessor that handles all the conversion from raw text into a pytorch Dataset
+    # # data_dir "data/retriever" should contain DPR training and dev files downloaded from https://github.com/facebookresearch/DPR
+    # # i.e., nq-train.json, nq-dev.json or trivia-train.json, trivia-dev.json
+    # label_list = ["hard_negative", "positive"]
+    # metric = "text_similarity_metric"
+    # question_tokenizer = Tokenizer.load(
+    #     pretrained_model_name_or_path=question_lang_model,
+    #     do_lower_case=do_lower_case, use_fast=use_fast
+    # )
+    # passage_tokenizer = Tokenizer.load(
+    #     pretrained_model_name_or_path=passage_lang_model,
+    #     do_lower_case=do_lower_case, use_fast=use_fast
+    # )
+    # processor = TextSimilarityProcessor(
+    #     query_tokenizer=question_tokenizer,
+    #     passage_tokenizer=passage_tokenizer, 
+    #     max_seq_len_query=64,
+    #     max_seq_len_passage=256,
+    #     label_list=label_list,
+    #     metric=metric,
+    #     data_dir=doc_dir,
+    #     train_filename=train_filename,
+    #     dev_filename=dev_filename,
+    #     test_filename=test_filename,
+    #     embed_title=embed_title,
+    #     num_hard_negatives=num_hard_negatives,
+    #     max_samples=10
+    # )
+    # # 4. Create an BiAdaptiveModel+
+    # # a) which consists of 2 pretrained language models as a basis
+    # question_language_model = LanguageModel.load(
+    #     pretrained_model_name_or_path=question_lang_model, 
+    #     language_model_class="DPRQuestionEncoder"
+    # ) 
+    # passage_language_model = LanguageModel.load(
+    #     pretrained_model_name_or_path=passage_lang_model, 
+    #     language_model_class="DPRContextEncoder"
+    # )
+    # # b) and a prediction head on top that is suited for our task => Question Answering
+    # prediction_head = TextSimilarityHead(similarity_function=similarity_function)
+
+
     return retriever
 
 
@@ -156,10 +228,10 @@ def main():
     elif args.retriever == "dpr":
         retriever = DensePassageRetriever(
             document_store=document_store,
-            # query_embedding_model = "nlpaueb/legal-bert-small-uncased",
-            # passage_embedding_model = "nlpaueb/legal-bert-small-uncased",
-            query_embedding_model="facebook/dpr-question_encoder-single-nq-base",
-            passage_embedding_model="facebook/dpr-ctx_encoder-single-nq-base",
+            query_embedding_model = "nlpaueb/legal-bert-small-uncased",
+            passage_embedding_model = "nlpaueb/legal-bert-small-uncased",
+            # query_embedding_model="facebook/dpr-question_encoder-single-nq-base",
+            # passage_embedding_model="facebook/dpr-ctx_encoder-single-nq-base",
             max_seq_len_query=args.input_tokens,
             max_seq_len_passage=args.input_tokens,
             infer_tokenizer_classes=True,
