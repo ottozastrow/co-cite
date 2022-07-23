@@ -83,7 +83,7 @@ def preprocess_json_and_save_to_parquet(args, tmp_dir_name):
                 data["label"] = data["label"].apply(
                     lambda citation: normalize_citation(
                         citation,
-                        remove_subsections=True, remove_subsubsections=True))
+                        remove_subsections=False, remove_subsubsections=True))
 
             if args.add_source_data:
                 retrieval_data = add_retrieval_data(data, knowledge_kb, args)
