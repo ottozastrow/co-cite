@@ -118,7 +118,7 @@ def train_dpr(retriever, args):
         embed_title=False,
         num_positives=1,
         num_hard_negatives=10,
-        max_processes=1,
+        max_processes=1
     )
 
 
