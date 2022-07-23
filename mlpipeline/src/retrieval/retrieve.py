@@ -142,8 +142,9 @@ def main():
     wandb.init(project="cocite", tags=["retrieve"], config=args, mode=args.wandb_mode)
 
     ######## setup document store #########
-    doc_index = "document_v2"
-    label_index = "labels_v2"
+    embedding_dim = 512
+    doc_index = f"document_embedding_dim_{embedding_dim}"
+    label_index = f"labels_embedding_dim_{embedding_dim}"
     use_es_store = True
     if use_es_store:
         document_store = ElasticsearchDocumentStore(
@@ -153,7 +154,7 @@ def main():
             index=doc_index,
             label_index=label_index,
             similarity="dot_product",
-            embedding_dim=512
+            embedding_dim=embedding_dim
         )
     else:
         document_store = InMemoryDocumentStore()
