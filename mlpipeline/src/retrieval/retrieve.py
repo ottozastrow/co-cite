@@ -49,8 +49,9 @@ def build_document_store(args, document_store, filepaths, preprocessor):
     
     for i in tqdm.tqdm(range(len(batches))):
         docs = data_utils.read_docs_batch_from_json(batches[i])
-        docs_processed = preprocessor.process(docs)
-        document_store.write_documents(docs_processed)
+        if args.retriever == "bm25":
+            docs = preprocessor.process(docs)
+        document_store.write_documents(docs)
     
     return document_store
 
@@ -108,11 +109,11 @@ def train_dpr(retriever, args):
         dev_filename=test_filename,
         test_filename=test_filename,
         n_epochs=1,
-        batch_size=1,
-        grad_acc_steps=8,
+        batch_size=args.batchsize,
+        grad_acc_steps=4,
         save_dir=save_dir,
         evaluate_every=3000,
-        embed_title=True,
+        embed_title=False,
         num_positives=10,
         num_hard_negatives=10,
     )
@@ -154,12 +155,16 @@ def main():
     elif args.retriever == "dpr":
         retriever = DensePassageRetriever(
             document_store=document_store,
+            # query_embedding_model = "t5-small",
+            # passage_embedding_model = "t5-small",
             query_embedding_model="facebook/dpr-question_encoder-single-nq-base",
             passage_embedding_model="facebook/dpr-ctx_encoder-single-nq-base",
-            max_seq_len_query=256,
-            max_seq_len_passage=256,
+            # max_seq_len_query=8,
+            # max_seq_len_passage=8,
             use_gpu=True,
             embed_title=False,
+            batch_size=args.batchsize,
+
         )
     elif args.retriever == "embedding":
         retriever = EmbeddingRetriever(
