@@ -98,22 +98,6 @@ def match_occurrences(decoded_labels, occurrence_map):
     return occurrences
 
 
-def build_wandb_table_row(
-        beams, decoded_labels, decoded_inputs, scores,
-        occurrences, mean_segment_accs, matches):
-    ### results table for wandb
-    # change dim ordering of list of lists
-    beams_reorderd = [list(i) for i in zip(*beams)]
-    columns_list = [
-        decoded_inputs, beams[0], decoded_labels, occurrences,
-        scores, mean_segment_accs, beams_reorderd
-    ]
-    columns_list.extend(list(matches.values()))
-    columns_list = list(columns_list)
-    row = [list(t) for t in zip(*(columns_list))]
-    return row
-
-
 def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     """Calls all metrics for this model and dataset.
     Results are logged in wandb.
@@ -174,10 +158,16 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
 
         for metric in metric_output.keys():
             metric_outputs[metric].append(metric_output[metric])
-             
-        samples_table += build_wandb_table_row(
-            beams, decoded_labels, decoded_inputs, occurrences,
-            scores, mean_segment_accs, matches)
+
+        beams_reorderd = [list(i) for i in zip(*beams)]
+        columns_list = [
+            decoded_inputs, beams[0], decoded_labels, occurrences,
+            scores, mean_segment_accs, beams_reorderd
+        ]
+        columns_list.extend(list(matches.values()))
+        columns_list = list(columns_list)
+        row = [list(t) for t in zip(*(columns_list))]
+        samples_table += row
 
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
                "scores", "segment_acc", "all_topk_predictions"]
