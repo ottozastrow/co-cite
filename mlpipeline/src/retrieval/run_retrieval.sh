@@ -1,5 +1,5 @@
 cd elasticsearch-7.9.2
 ./bin/elasticsearch &
-sleep 30
+sleep 40
 cd ../
-python retrieve.py --samples=10000 --retriever="embedding" --rebuild_dataset
+python retrieval/retrieve.py --samples=1000 --retriever="dpr" --rebuild_dataset --batchsize=2
