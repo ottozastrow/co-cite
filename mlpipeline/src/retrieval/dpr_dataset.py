@@ -1,4 +1,10 @@
 """
+# design decisions
+# 1. we don't reinsert citations in context segments. TODO: change this. only benefits implementation time. during inference the retriever shouldn't rely on the QUERY containing inserted citations, however the retrieved contexts may contain them.
+
+# 2. identity mapping not removed in train set.
+
+
 building a dpr database
 we need a lookup table with key=label and value=inputs
 then we collect all matches and put them into the positive ctxs field
@@ -152,9 +158,6 @@ def build_dpr(args):
     args.num_negatives = 10
     args.minimum_positives = 4
     max_contexts_per_citation = args.minimum_positives
-    # wandb.init(project="cocite", tags=["DPR"], config=args, mode=args.wandb_mode)
-    # tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
-    # # TODO  call update_tokenizer(args) and model.resize_token_embeddings(len(tokenizer))
 
     preprocessor = data_utils.setup_preprocessor(args)
 
@@ -166,13 +169,10 @@ def build_dpr(args):
     train_index = citation_pairs_from_docs(train_files, args, max_contexts_per_citation=max_contexts_per_citation)
     train_dpr_dataset = dpr_dataset_from_citation_pairs(train_index, preprocessor, args)
 
-    # train_docs = read_files(train_files, preprocessor)
-    # test_docs = read_files(test_files, preprocessor)
-
     print("done building dpr dataset, number of samples for train is:",
         len(train_dpr_dataset), "and test: ", len(test_dpr_dataset))
 
-    data_dir = f"../../data/retrieval/dpr/v1/"
+    data_dir = f"../../data/retrieval/{args.retriever}/data_len_{args.samples}/"
     if not os.path.exists(data_dir):
         os.makedirs(data_dir)
 
@@ -183,14 +183,3 @@ def build_dpr(args):
         json.dump(test_dpr_dataset, f, indent=4)
 
     print("done saving dpr dataset")
-
-
-args = config.cmd_arguments()
-build_dpr(args)
-
-# design decisions
-# 1. we don't reinsert citations in context segments. TODO: change this. only benefits implementation time. during inference the retriever shouldn't rely on the QUERY containing inserted citations, however the retrieved contexts may contain them.
-
-# 2. identity mapping not removed in train set.
-
-# 3. preprocessor not used.

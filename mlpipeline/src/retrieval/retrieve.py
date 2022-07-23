@@ -1,7 +1,9 @@
-from haystack.utils import clean_wiki_text, convert_files_to_docs, fetch_archive_from_http, print_answers
+import os
+import tqdm
+import random
+import numpy as np
+import wandb
 from haystack.nodes import BM25Retriever, EmbeddingRetriever
-
-from train_dpr import DensePassageRetriever
 
 from haystack.document_stores import FAISSDocumentStore
 from haystack.document_stores import ElasticsearchDocumentStore, InMemoryDocumentStore
@@ -9,15 +11,11 @@ from haystack.utils import launch_es
 from haystack.pipelines import Pipeline
 from haystack.nodes import Docs2Answers
 
+from train_dpr import DensePassageRetriever
+
 import config
 import retrieval.data_utils as data_utils
-
-import tqdm
-import numpy as np
-import pandas as pd
-import random
-
-import wandb
+import retrieval.dpr_dataset as dpr_dataset
 
 
 def manual_es_launch():
@@ -73,6 +71,7 @@ def docs_contain_citation(docs, citation):
 def print_metrics(mrr, k_list):
     recalls = recall_at_k(mrr, k_list)
     print("Recall@k: ", recalls)
+    wandb.log({'Recall@k': recalls})
     
     # count values that arent -1
     positives = [x for x in mrr if x != -1]
@@ -94,14 +93,20 @@ def print_metrics(mrr, k_list):
 
 
 def train_dpr(retriever, args):
-    #train_filename = "train/biencoder-nq-train.json"
+    # tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
+    # # TODO  call update_tokenizer(args) and model.resize_token_embeddings(len(tokenizer))
+
     test_filename = "test_dpr_dataset.json"
     train_filename = "train_dpr_dataset.json"
-    # WARNING: both are set to same file for debugging
 
-    doc_dir = f"../../data/retrieval/{args.retriever}/v1/"
-    save_dir = "../../model_save/retrieval/" + args.retriever + "/"
+    doc_dir = f"../../data/retrieval/{args.retriever}/data_len_{args.samples}/"
+    save_dir = f"../../model_save/retrieval/data_len_{args.samples}/args.retriever/"
 
+    if not os.path.exists(doc_dir + test_filename) or \
+        not os.path.exists(doc_dir + train_filename) \
+            or args.rebuild_dataset:
+        print("building new dpr dataset")
+        dpr_dataset.build_dpr(args)
     if not isinstance(retriever, DensePassageRetriever):
         raise ValueError("DPR only works with DPR retriever")
 
