@@ -153,11 +153,20 @@ def dpr_dataset_from_citation_pairs(index, preprocessor, args):
     return filtered_dpr_dataset
 
 
-def build_dpr(args):
+def build_dpr(args, doc_dir):
     data_utils.load_retrieval_dataset(args)
-    args.num_negatives = 10
+    args.num_negatives = 4
     args.minimum_positives = 4
     max_contexts_per_citation = args.minimum_positives
+    dataset_descriptor = {
+        "name": "dpr_with_similar_citations",
+        "num_negatives": args.num_negatives,
+        "minimum_positives": args.minimum_positives,
+        "max_contexts_per_citation": max_contexts_per_citation,
+        "samples": args.samples,
+        "dont_normalize_citations": args.dont_normalize_citations,
+        "input_tokens": args.input_tokens,
+    }
 
     preprocessor = data_utils.setup_preprocessor(args)
 
@@ -165,21 +174,29 @@ def build_dpr(args):
 
     test_index = citation_pairs_from_docs(test_files, args, max_contexts_per_citation=max_contexts_per_citation)
     test_dpr_dataset = dpr_dataset_from_citation_pairs(test_index, preprocessor, args)
+    assert len(test_dpr_dataset) != 0, "No test samples found"
 
     train_index = citation_pairs_from_docs(train_files, args, max_contexts_per_citation=max_contexts_per_citation)
     train_dpr_dataset = dpr_dataset_from_citation_pairs(train_index, preprocessor, args)
+    assert len(train_dpr_dataset) != 0, "No train samples found"
+
+    dataset_descriptor["train_size"] = len(train_dpr_dataset)
+    dataset_descriptor["test_size"] = len(test_dpr_dataset)
 
     print("done building dpr dataset, number of samples for train is:",
         len(train_dpr_dataset), "and test: ", len(test_dpr_dataset))
 
-    data_dir = f"../../data/retrieval/{args.retriever}/data_len_{args.samples}/"
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    if not os.path.exists(doc_dir):
+        os.makedirs(doc_dir)
 
     # save dict to pretty printed json
-    with open(f"{data_dir}/train_dpr_dataset.json", "w") as f:
+    with open(f"{doc_dir}/train_dpr_dataset.json", "w") as f:
         json.dump(train_dpr_dataset, f, indent=4)
-    with open(f"{data_dir}/test_dpr_dataset.json", "w") as f:
+    with open(f"{doc_dir}/test_dpr_dataset.json", "w") as f:
         json.dump(test_dpr_dataset, f, indent=4)
 
     print("done saving dpr dataset")
+    
+    with open(f"{doc_dir}/dataset_descriptor.json", "w") as f:
+        json.dump(dataset_descriptor, f, indent=4)
+    print("done saving dataset descriptor")

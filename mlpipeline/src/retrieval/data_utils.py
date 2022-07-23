@@ -61,7 +61,7 @@ def load_retrieval_dataset(args) -> tuple[list, list]:
     if args.debug:
         all_filepaths = all_filepaths[:10]
     
-    test_split = 0.1 if not args.debug else 0.5
+    test_split = 0.2 if not args.debug else 0.5
     test_split_index = round(len(all_filepaths) * (1-test_split))
 
     train_filepaths = all_filepaths[:test_split_index]

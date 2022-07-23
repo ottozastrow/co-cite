@@ -1,6 +1,8 @@
 import os
 import tqdm
 import random
+import json
+
 import numpy as np
 import wandb
 from haystack.nodes import BM25Retriever, EmbeddingRetriever
@@ -71,14 +73,13 @@ def docs_contain_citation(docs, citation):
 def print_metrics(mrr, k_list):
     recalls = recall_at_k(mrr, k_list)
     print("Recall@k: ", recalls)
-    wandb.log({'Recall@k': recalls})
+    for (k, recall) in recalls.items():
+        wandb.log({f"Recall@{k}": recall})
     
     # count values that arent -1
     positives = [x for x in mrr if x != -1]
-    print("Positives:", positives)
-    print("Total:", len(mrr))
+
     negatives = len(mrr) - len(positives)
-    print("Negatives:", negatives)
     print("Accuracy:", len(positives) / len(mrr))
 
     # average vaulue of positives
@@ -92,7 +93,7 @@ def print_metrics(mrr, k_list):
     wandb.log({"Negatives": negatives})
 
 
-def train_dpr(retriever, args):
+def train_dpr(retriever: DensePassageRetriever, args):
     # tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
     # # TODO  call update_tokenizer(args) and model.resize_token_embeddings(len(tokenizer))
 
@@ -102,13 +103,19 @@ def train_dpr(retriever, args):
     doc_dir = f"../../data/retrieval/{args.retriever}/data_len_{args.samples}/"
     save_dir = f"../../model_save/retrieval/data_len_{args.samples}/args.retriever/"
 
+    # create dataset if it doesnt exist yet
     if not os.path.exists(doc_dir + test_filename) or \
         not os.path.exists(doc_dir + train_filename) \
             or args.rebuild_dataset:
         print("building new dpr dataset")
-        dpr_dataset.build_dpr(args)
-    if not isinstance(retriever, DensePassageRetriever):
-        raise ValueError("DPR only works with DPR retriever")
+        dpr_dataset.build_dpr(args, doc_dir)
+    
+    # read dataset_descriptor with json from file at doc_dir + "dataset_descriptor.json"
+    with open(doc_dir + "dataset_descriptor.json") as f:
+        dataset_descriptor = json.load(f)
+    # update summary at wandb
+    wandb.summary.update(dataset_descriptor)
+
 
     retriever.train(
         data_dir=doc_dir,
@@ -217,7 +224,7 @@ def evaluate_manual(args, test_filepaths, retriever):
     print_metrics(mrr, k_list)
 
 
-def recall_at_k(reciprocal_ranks, k_list):
+def recall_at_k(reciprocal_ranks, k_list) -> dict[int, float]:
     recall_at_k = {}
     for k in k_list:
         recall_at_k[k] = len([1 for r in reciprocal_ranks if r <= k and r > -1]) / len(reciprocal_ranks)
@@ -236,7 +243,6 @@ def evaluate_haystack(args, test_filepaths, retriever, document_store,
 
     document_store.add_eval_data(
         filename="evalset.json",
-        # filename="data/tutorial5/nq_dev_subset_v2.json",
         doc_index=doc_index,
         label_index=label_index,
         preprocessor=preprocessor,
