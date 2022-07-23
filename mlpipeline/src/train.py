@@ -77,7 +77,7 @@ def main():
     # valid number between 100 and 5000
     ds_len = len(tokenized_test["label"])
     num_demo_samples = max(100, ds_len // 20)
-    num_demo_samples = min(10000, num_demo_samples)
+    num_demo_samples = min(5000, num_demo_samples)
 
     if num_demo_samples > ds_len:
         num_demo_samples = ds_len
