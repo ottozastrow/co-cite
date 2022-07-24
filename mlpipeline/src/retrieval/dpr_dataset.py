@@ -65,7 +65,7 @@ def sample_to_dpr_format(dpr_dataset: list, texts: list, citation:str, preproces
 
     for text in texts:
         # randomly select 5 texts from texts
-        sampled_texts = random.sample(texts, args.max_contexts_per_citation)
+        sampled_texts = random.sample(texts, args.num_positives)
         sample = {
                 "dataset": "dpr_with_similar_citations",
                 "answers": [citation],
