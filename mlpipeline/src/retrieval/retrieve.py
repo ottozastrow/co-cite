@@ -146,8 +146,10 @@ def main():
 
     ######## setup document store #########
     embedding_dim = 512
-    doc_index = f"document_embedding_dim_{embedding_dim}"
-    label_index = f"labels_embedding_dim_{embedding_dim}"
+    # doc_index = f"document_embedding_dim_{embedding_dim}"
+    # label_index = f"labels_embedding_dim_{embedding_dim}"
+    doc_index ="document_v2"
+    label_index ="labels_v2"
     use_es_store = True
     if use_es_store:
         document_store = ElasticsearchDocumentStore(
