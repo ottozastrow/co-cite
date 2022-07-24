@@ -156,7 +156,7 @@ def dpr_dataset_from_citation_pairs(index, preprocessor, args):
 def build_dpr(args, doc_dir):
     data_utils.load_retrieval_dataset(args)
     args.num_negatives = 4
-    args.minimum_positives = 4
+    args.minimum_positives = 1
     max_contexts_per_citation = args.minimum_positives
     dataset_descriptor = {
         "name": "dpr_with_similar_citations",

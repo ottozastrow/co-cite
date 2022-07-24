@@ -208,7 +208,8 @@ def main():
 
 
 def evaluate_manual(args, test_filepaths, retriever):
-    questions, answers = data_utils.load_labels(args, test_filepaths)
+    max_eval_documents = 100
+    questions, answers = data_utils.load_labels(args, test_filepaths[:max_eval_documents])
     # shuffle the order of questions and answers
     both = list(zip(questions, answers))
     random.seed(42)
