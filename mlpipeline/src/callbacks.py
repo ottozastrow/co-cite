@@ -60,7 +60,7 @@ class SaveModelCallback(tf.keras.callbacks.Callback):
     def save_model(self, epoch):
         if not os.path.exists(self.save_path):
             os.makedirs(self.save_path)
-        name = f"\n{self.save_path}epoch_{epoch}_step_{self.training_step * self.args.batchsize}"
+        name = f"{self.save_path}epoch_{epoch}_step_{self.training_step * self.args.batchsize}"
 
         wandb.log({"last_saved_model": name})
         self.model.save_pretrained(name)
