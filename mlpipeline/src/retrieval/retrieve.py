@@ -183,11 +183,12 @@ def main():
 
         if args.retriever_saved_models is not None:
             doc_dir = args.retriever_saved_models
-            query_embedding_model = doc_dir + "/query_embedding_model/"
-            passage_embedding_model = doc_dir + "/passage_embedding_model/"
+            query_embedding_model = doc_dir + "/query_encoder/"
+            passage_embedding_model = doc_dir + "/passage_encoder/"
             assert args.notraining == False, "probably not intended. remove assertion when needed"
             assert os.path.exists(query_embedding_model)
             assert os.path.exists(passage_embedding_model)
+            print("loading saved models from ", doc_dir)
         else:
             query_embedding_model = "nlpaueb/legal-bert-small-uncased",
             passage_embedding_model = "nlpaueb/legal-bert-small-uncased",
