@@ -44,7 +44,7 @@ def manual_es_launch():
 def build_document_store(args, document_store, filepaths, preprocessor):
 
     if args.rebuild_dataset:
-        document_store.delete_all_documents()
+        document_store.delete_documents()
 
     filebatchsize=100
     batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
