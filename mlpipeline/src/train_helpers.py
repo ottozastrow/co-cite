@@ -98,6 +98,16 @@ def match_occurrences(decoded_labels, occurrence_map):
     return occurrences
 
 
+def log_metrics(metric_outputs, prefix):
+    mean_metric_outputs = {}
+    for (metric_name, metric_data) in metric_outputs.items():
+        mean_metric_outputs[metric_name] = np.mean(metric_data)
+
+    print({prefix: mean_metric_outputs})
+    wandb.log({prefix: mean_metric_outputs})
+    return mean_metric_outputs
+
+
 def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     """Calls all metrics for this model and dataset.
     Results are logged in wandb.
@@ -118,7 +128,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
 
     all_scores = []
     metric_outputs = collections.defaultdict(list)
-    
+    counter = 1
     for batch in tqdm.tqdm(dataset):
         predictions, scores, latency = generate_batch(model, batch["input_ids"], args)
         metric_outputs["latency"].append(latency / args.eval_batchsize)
@@ -168,6 +178,11 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
         columns_list = list(columns_list)
         row = [list(t) for t in zip(*(columns_list))]
         samples_table += row
+        if counter % 25 == 0:
+            log_metrics(metric_outputs, prefix + "_incremental")
+        counter += 1
+
+    mean_metric_outputs = log_metrics(metric_outputs, prefix)
 
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
                "scores", "segment_acc", "all_topk_predictions"]
@@ -176,15 +191,9 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     wandb_table = wandb.Table(columns=columns, data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
-    mean_metric_outputs = {}
-    for (metric_name, metric_data) in metric_outputs.items():
-        mean_metric_outputs[metric_name] = np.mean(metric_data)
+    np_all_scores = np.array(all_scores)
+    plots.plot_precision_recall(prefix, all_matches, np_all_scores, top_ks=top_ks)
 
-    print({prefix: mean_metric_outputs})
-    wandb.log({prefix: mean_metric_outputs})
-
-    all_scores = np.array(all_scores)
-    plots.plot_precision_recall(prefix, all_matches, all_scores, top_ks=top_ks)
     table = pd.DataFrame(samples_table, columns=columns)
     plots.plot_accs_per_occurrence(prefix, table, columns=["segment_acc"] + topk_keys)
 
