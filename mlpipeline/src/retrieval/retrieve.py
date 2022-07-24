@@ -122,14 +122,14 @@ def train_dpr(retriever: DensePassageRetriever, args):
         train_filename=train_filename,
         dev_filename=test_filename,
         test_filename=test_filename,
-        n_epochs=1,
+        n_epochs=args.epochs,
         batch_size=args.batchsize,
         grad_acc_steps=4,
         save_dir=save_dir,
         evaluate_every=7000,
         embed_title=False,
         num_positives=1,
-        num_hard_negatives=10,
+        num_hard_negatives=5,
         max_processes=1
     )
 
