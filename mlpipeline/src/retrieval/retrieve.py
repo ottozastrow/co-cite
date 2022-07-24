@@ -100,8 +100,11 @@ def train_dpr(retriever: DensePassageRetriever, args):
     test_filename = "test_dpr_dataset.json"
     train_filename = "train_dpr_dataset.json"
 
-    doc_dir = f"../../data/retrieval/{args.retriever}/data_len_{args.samples}/"
-    save_dir = f"../../model_save/retrieval/data_len_{args.samples}/args.retriever/"
+    samples: str = "all" if args.samples == -1 else str(args.samples)
+
+    doc_dir = f"../../data/retrieval/{args.retriever}/data_len_{samples}/"
+    save_dir = f"../../model_save/retrieval/data_len_{args.samples}/{args.retriever}/"
+
 
     # create dataset if it doesnt exist yet
     if not os.path.exists(doc_dir + test_filename) or \
@@ -116,22 +119,22 @@ def train_dpr(retriever: DensePassageRetriever, args):
     # update summary at wandb
     wandb.summary.update(dataset_descriptor)
 
-
-    retriever.train(
-        data_dir=doc_dir,
-        train_filename=train_filename,
-        dev_filename=test_filename,
-        test_filename=test_filename,
-        n_epochs=args.epochs,
-        batch_size=args.batchsize,
-        grad_acc_steps=4,
-        save_dir=save_dir,
-        evaluate_every=7000,
-        embed_title=False,
-        num_positives=1,
-        num_hard_negatives=5,
-        max_processes=1
-    )
+    if not args.notraining:
+        retriever.train(
+            data_dir=doc_dir,
+            train_filename=train_filename,
+            dev_filename=test_filename,
+            test_filename=test_filename,
+            n_epochs=args.epochs,
+            batch_size=args.batchsize,
+            grad_acc_steps=4,
+            save_dir=save_dir,
+            evaluate_every=20000,
+            embed_title=False,
+            num_positives=1,
+            num_hard_negatives=5,
+            max_processes=1
+        )
 
 
     return retriever
@@ -175,11 +178,24 @@ def main():
     ######## setup retriever #########
     if args.retriever == "bm25":
         retriever = BM25Retriever(document_store)
+
     elif args.retriever == "dpr":
-        retriever = DensePassageRetriever(
-            document_store=document_store,
+
+        if args.retriever_saved_models is not None:
+            doc_dir = args.retriever_saved_models
+            query_embedding_model = doc_dir + "/query_embedding_model/"
+            passage_embedding_model = doc_dir + "/passage_embedding_model/"
+            assert args.notraining == False, "probably not intended. remove assertion when needed"
+            assert os.path.exists(query_embedding_model)
+            assert os.path.exists(passage_embedding_model)
+        else:
             query_embedding_model = "nlpaueb/legal-bert-small-uncased",
             passage_embedding_model = "nlpaueb/legal-bert-small-uncased",
+
+        retriever = DensePassageRetriever(
+            document_store=document_store,
+            query_embedding_model=query_embedding_model,
+            passage_embedding_model=passage_embedding_model,
             # query_embedding_model="facebook/dpr-question_encoder-single-nq-base",
             # passage_embedding_model="facebook/dpr-ctx_encoder-single-nq-base",
             max_seq_len_query=args.input_tokens,
@@ -188,8 +204,8 @@ def main():
             use_gpu=True,
             embed_title=False,
             batch_size=args.batchsize,
-
         )
+
     elif args.retriever == "embedding":
         retriever = EmbeddingRetriever(
             document_store=document_store,
@@ -208,6 +224,7 @@ def main():
     if args.rebuild_dataset:
         if args.retriever != "bm25":
             document_store.update_embeddings(retriever)
+    print("finished updating embeddings")
 
     evaluate_manual(args, test_filepaths, retriever)
 

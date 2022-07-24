@@ -140,10 +140,10 @@ def read_files(filepaths: list, preprocessor) -> list:
 def dpr_dataset_from_citation_pairs(index, preprocessor, args):
     # iterate through index and convert to dpr format
     dpr_dataset = []
-    for (citation, text) in tqdm.tqdm(index.items()):
-        sample_to_dpr_format(dpr_dataset, text, citation, preprocessor, args)
+    for (citation, texts) in tqdm.tqdm(index.items()):
+        sample_to_dpr_format(dpr_dataset, texts, citation, preprocessor, args)
 
-    # drop all samples with less than 2 positive contexts (especially since one is the identity mapping)
+    # drop all samples with less than n positive contexts (especially since one is the identity mapping)
     filtered_dpr_dataset = [
         sample for sample in dpr_dataset
         if len(sample["positive_ctxs"]) >= args.num_positives
@@ -160,7 +160,7 @@ def build_dpr(args, doc_dir):
     data_utils.load_retrieval_dataset(args)
     args.num_negatives = 5
     args.num_positives = 1
-    max_contexts_per_citation = args.num_positives
+    max_contexts_per_citation = 50
     dataset_descriptor = {
         "name": "dpr_with_similar_citations",
         "num_negatives": args.num_negatives,
