@@ -139,7 +139,10 @@ def train_dpr(retriever: DensePassageRetriever, args):
 
 def main():
     args = config.cmd_arguments()
-    wandb.init(project="cocite", tags=["retrieve"], config=args, mode=args.wandb_mode)
+    wandb.init(
+        project="cocite", tags=["retrieve"], config=args,
+        mode=args.wandb_mode,
+        settings=wandb.Settings(start_method="fork"))
 
     ######## setup document store #########
     embedding_dim = 512
