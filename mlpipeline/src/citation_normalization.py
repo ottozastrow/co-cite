@@ -77,7 +77,7 @@ def sections_from_statute(
                 section = section[:-1]
             new_sections.append(section)
         sections = new_sections
-    if len(sections == 0):
+    if len(sections) == 0:
         print("warning: no sections found in statute", sections, statute_orig, statute)
     # for section in sections:
         # if len(section) == 0:
