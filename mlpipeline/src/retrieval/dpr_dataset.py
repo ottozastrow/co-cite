@@ -65,7 +65,7 @@ def sample_to_dpr_format(dpr_dataset: list, texts: list, citation:str, preproces
 
     for text in texts:
         # randomly select 5 texts from texts
-        sampled_texts = random.sample(texts, args.num_positives)
+        sampled_texts = random.sample(texts, min(args.retriever_num_positives, len(texts)))
         sample = {
                 "dataset": "dpr_with_similar_citations",
                 "answers": [citation],
@@ -146,7 +146,7 @@ def dpr_dataset_from_citation_pairs(index, preprocessor, args):
     # drop all samples with less than n positive contexts (especially since one is the identity mapping)
     filtered_dpr_dataset = [
         sample for sample in dpr_dataset
-        if len(sample["positive_ctxs"]) >= args.num_positives
+        if len(sample["positive_ctxs"]) >= args.retriever_num_positives
     ]
     
     # add negatives
@@ -159,12 +159,11 @@ def dpr_dataset_from_citation_pairs(index, preprocessor, args):
 def build_dpr(args, doc_dir):
     data_utils.load_retrieval_dataset(args)
     args.num_negatives = 5
-    args.num_positives = 1
     max_contexts_per_citation = 50
     dataset_descriptor = {
         "name": "dpr_with_similar_citations",
         "num_negatives": args.num_negatives,
-        "num_positives": args.num_positives,
+        "num_positives": args.retriever_num_positives,
         "max_contexts_per_citation": max_contexts_per_citation,
         "samples": args.samples,
         "dont_normalize_citations": args.dont_normalize_citations,

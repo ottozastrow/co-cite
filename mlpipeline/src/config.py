@@ -11,6 +11,7 @@ def cmd_arguments(debug=False, testargs=None):
 
     ## retrieval
     parser.add_argument("--retriever", type=str, help="retriever type from 'bm25'|'dpr'|'embedding'", default="bm25")
+    parser.add_argument("--retriever_num_positives", type=int, help="number of positives for retrieval", default=1)
     parser.add_argument("--retriever_saved_models", type=str, help="path to directory containing query and passage embedding model", default=None)
 
     ## wandb arguments

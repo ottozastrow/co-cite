@@ -57,8 +57,10 @@ def generate_batch(model, inputs, args):
     predictions = modeloutdict["sequences"]
 
     if args.topk != 1:
-        scores = list(scores.numpy())
-        scores = [scores[i] for i in range(len(scores)) if i%args.topk == 0]  # TODO remove or check if highest score is at index =0
+        scores = list(scores.numpy())  # from tensor
+        scores_top1 = [scores[i] for i in range(len(scores)) if i%args.topk == 0]
+        # convert to list of lists (batchsize x beams)
+        scores_topk = [scores[i::args.topk] for i in range(args.topk)]
 
     else:
         # when args.topk == 1, predictions is a tuple of logits (tensor)
@@ -68,11 +70,11 @@ def generate_batch(model, inputs, args):
         probabilities = tf.reduce_max(scores, axis=2)
         mean_probabilites = tf.reduce_mean(probabilities, axis=0)
 
-        scores = mean_probabilites.numpy().tolist()
+        scores_top1 = mean_probabilites.numpy().tolist()
 
         predictions = [predictions]
 
-    return predictions, scores, latency
+    return predictions, scores_top1, latency, scores_topk
 
 
 def load_occurrences(args):
@@ -130,9 +132,9 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     metric_outputs = collections.defaultdict(list)
     counter = 1
     for batch in tqdm.tqdm(dataset):
-        predictions, scores, latency = generate_batch(model, batch["input_ids"], args)
+        predictions, scores_top1, latency, scores_topk = generate_batch(model, batch["input_ids"], args)
         metric_outputs["latency"].append(latency / args.eval_batchsize)
-        all_scores += scores
+        all_scores += scores_top1
 
         decoded_predictions, decoded_labels, decoded_inputs = tokens_2_words(
             tokenizer, predictions, batch["labels"], batch["input_ids"])
@@ -172,7 +174,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
         beams_reorderd = [list(i) for i in zip(*beams)]
         columns_list = [
             decoded_inputs, beams[0], decoded_labels, occurrences,
-            scores, mean_segment_accs, beams_reorderd
+            scores_topk, mean_segment_accs, beams_reorderd
         ]
         columns_list.extend(list(matches.values()))
         columns_list = list(columns_list)
@@ -185,7 +187,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     mean_metric_outputs = log_metrics(metric_outputs, prefix)
 
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
-               "scores", "segment_acc", "all_topk_predictions"]
+               "scores_topk", "segment_acc", "all_topk_predictions"]
     topk_keys = ["top-" + str(i) for i in all_matches.keys()]
     columns.extend(topk_keys)
     wandb_table = wandb.Table(columns=columns, data=samples_table)

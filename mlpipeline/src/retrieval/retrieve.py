@@ -49,7 +49,9 @@ def build_document_store(args, document_store, filepaths, preprocessor):
     filebatchsize=100
     batches = [filepaths[i:i+filebatchsize] for i in range(0, len(filepaths), filebatchsize)]
     
-    for i in tqdm.tqdm(range(len(batches))):
+    pbar = tqdm.tqdm(range(len(batches)))
+    for i in pbar:
+        pbar.set_description(f"Building document store: {i}/{len(batches)}")
         docs = data_utils.read_docs_batch_from_json(batches[i])
         if args.retriever == "bm25":
             docs = preprocessor.process(docs)
@@ -131,7 +133,7 @@ def train_dpr(retriever: DensePassageRetriever, args):
             save_dir=save_dir,
             evaluate_every=20000,
             embed_title=False,
-            num_positives=1,
+            num_positives=args.retriever_num_positives,
             num_hard_negatives=5,
             max_processes=1
         )
@@ -189,8 +191,9 @@ def main():
             assert os.path.exists(passage_embedding_model)
             print("loading saved models from ", doc_dir)
         else:
-            query_embedding_model = "nlpaueb/legal-bert-small-uncased",
-            passage_embedding_model = "nlpaueb/legal-bert-small-uncased",
+            query_embedding_model = "nlpaueb/legal-bert-small-uncased"
+            passage_embedding_model = "nlpaueb/legal-bert-small-uncased"
+
 
         retriever = DensePassageRetriever(
             document_store=document_store,
@@ -239,7 +242,10 @@ def evaluate_manual(args, test_filepaths, retriever):
     questions, answers = zip(*both)
     k_list = [1, 5, 20, 50, 100, 200, 500]
     mrr = []
-    for i in tqdm.tqdm(range(len(questions))):
+
+    pbar = tqdm.tqdm(range(len(questions)))
+    for i in pbar:
+        pbar.set_description(f"Evaluating question {i}")
         question = questions[i]
         retrieved_docs = retriever.retrieve(query=question, top_k=max(k_list))
         mrr.append(docs_contain_citation(retrieved_docs, answers[i]))
