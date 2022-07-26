@@ -18,8 +18,8 @@ def plot_precision_recall(prefix, matches, scores, top_ks, buckets=39) -> None:
     for k in top_ks:
         # for every threshold, compute the precision
         
-        precisions = []
-        if len(matches[k]) > 0:
+        if len(matches[k]) > 0:  # should never be == 0 but there was a bug i couldn't bother to find the source of
+            precisions = []
             for threshold in thresholds:
                 # compute the number of true positives
                 # import pdb
@@ -32,10 +32,8 @@ def plot_precision_recall(prefix, matches, scores, top_ks, buckets=39) -> None:
                 precision = true_positives / (true_positives + false_positives)
                 # append the precision to the list of precisions
                 precisions.append(precision)
-        else:
-            precisions.append([0 for _ in range(len(thresholds))])
+            plt.plot([i/buckets for i in range(1, buckets +1)], precisions, label="top " + str(k))
     
-        plt.plot([i/buckets for i in range(1, buckets +1)], precisions, label="top " + str(k))
         # plot with legend
         # yaxsis, xaxis, title
     plt.xlabel('recall')

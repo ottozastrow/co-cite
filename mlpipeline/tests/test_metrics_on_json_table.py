@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 import config
 
 def test_dynamic_k():
-    filepath = "../../data/tables/test_demo_1_e85451fb7b21661f977c.table.json"
+    filepath = "../../data/tables/test_demo_1_77996edc9af3e9d12630.table.json"
     # check if exists
     if not os.path.exists(filepath):
         raise Exception("filepath does not exist")
@@ -46,7 +46,9 @@ def dynamic_k(table, args):
     # import matplotlib.pyplot as plt
     import matplotlib.pyplot as plt
     # plot histogramm of dynamic_k
-    plt.hist(table["dynamic_k"])
+    # plt.hist(table["dynamic_k"])
+    print(table.keys())
+    plt.hist(table["first_matches"])
     plt.xlabel("dynamic_k")
     plt.ylabel("count")
     plt.title("Histogram of dynamic_k")
