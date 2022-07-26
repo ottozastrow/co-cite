@@ -75,13 +75,21 @@ def matches_at_k(beams, labels, top_ks, several_beams=False) -> tuple[dict, dict
             match_at_k[i, j] = exact_match
 
     results = {}
+
+    # index of first correct beam per sample
     first_matches = []
+    for sample_i in range(len(labels)):
+        # first match is the smallest index where matches[i] is True
+        first_match = -1
+        for beam_j in range(len(match_at_k)):
+            if match_at_k[beam_j][sample_i] == True:
+                first_match = beam_j
+                break
+        first_matches.append(first_match)
+
     for k in top_ks:
         matches_topk = np.any(match_at_k[:k, :], axis=0)
         matches_topk = np.array(matches_topk).astype(int)
-
-        # first match is the smallest index where matches[i] is True
-        first_matches.append(np.argmax(matches_topk))
 
         matches[k] = matches_topk
         topk_acc = np.mean(matches_topk)
