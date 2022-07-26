@@ -19,7 +19,7 @@ def plot_precision_recall(prefix, matches, scores, top_ks, buckets=39) -> None:
         # for every threshold, compute the precision
         
         precisions = []
-        if len(matches[k] > 0):
+        if len(matches[k]) > 0:
             for threshold in thresholds:
                 # compute the number of true positives
                 # import pdb
@@ -33,7 +33,7 @@ def plot_precision_recall(prefix, matches, scores, top_ks, buckets=39) -> None:
                 # append the precision to the list of precisions
                 precisions.append(precision)
         else:
-            precisions.append(None)
+            precisions.append([0 for _ in range(len(thresholds))])
     
 
         # plot curve
