@@ -13,6 +13,7 @@ data/**
 **/mlruns/
 **/results/
 **/model_save/
+**/tensorboard_logs/
 **.html
 **/.vscode**
 

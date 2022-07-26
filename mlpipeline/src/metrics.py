@@ -45,7 +45,7 @@ def citation_segment_acc(
     return accs
 
 
-def matches_at_k(beams, labels, top_ks, several_beams=False) -> tuple[dict, dict]:
+def matches_at_k(beams, labels, top_ks, several_beams=False) -> tuple[dict, dict, list]:
     """
     tupledict is a tuple of (dict(list()), list())
     its counterintuitive but I'll keep it since the huggingface
@@ -64,7 +64,6 @@ def matches_at_k(beams, labels, top_ks, several_beams=False) -> tuple[dict, dict
 
     match_at_k = np.zeros((len(beams), len(labels)))
     matches = {}
-    results = {}
     # iterate through all beams
     for i in range(len(beams)):
         beam = beams[i]
@@ -75,14 +74,17 @@ def matches_at_k(beams, labels, top_ks, several_beams=False) -> tuple[dict, dict
             exact_match = x == y
             match_at_k[i, j] = exact_match
 
+    results = {}
+    first_matches = []
     for k in top_ks:
         matches_topk = np.any(match_at_k[:k, :], axis=0)
         matches_topk = np.array(matches_topk).astype(int)
+
+        # first match is the smallest index where matches[i] is True
+        first_matches.append(np.argmax(matches_topk))
 
         matches[k] = matches_topk
         topk_acc = np.mean(matches_topk)
         results[f"top{k}_acc"] = topk_acc
 
-    top1matches = list(match_at_k[0])
-
-    return results, matches
+    return results, matches, first_matches

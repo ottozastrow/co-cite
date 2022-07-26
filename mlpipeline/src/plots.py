@@ -35,9 +35,6 @@ def plot_precision_recall(prefix, matches, scores, top_ks, buckets=39) -> None:
         else:
             precisions.append([0 for _ in range(len(thresholds))])
     
-
-        # plot curve
-        # plt.legend(["top " + str(k)])
         plt.plot([i/buckets for i in range(1, buckets +1)], precisions, label="top " + str(k))
         # plot with legend
         # yaxsis, xaxis, title

@@ -142,7 +142,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
 
         beams = rearrange_model_generate(decoded_predictions, args)
 
-        metric_output, matches = metrics.matches_at_k(beams, decoded_labels, top_ks=top_ks, several_beams=True)
+        metric_output, matches, first_matches = metrics.matches_at_k(beams, decoded_labels, top_ks=top_ks, several_beams=True)
         # add matches dict to all matches
         for k in list(matches.keys()):
             all_matches[k].extend(matches[k])
@@ -175,7 +175,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
         beams_reorderd = [list(i) for i in zip(*beams)]
         columns_list = [
             decoded_inputs, beams[0], decoded_labels, occurrences,
-            scores_topk, mean_segment_accs, beams_reorderd
+            scores_topk, mean_segment_accs, beams_reorderd, first_matches
         ]
         # columns_list.extend(list(matches.values()))
         columns_list = list(columns_list)
@@ -190,7 +190,7 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     mean_metric_outputs = log_metrics(metric_outputs, prefix)
 
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
-               "scores_topk", "segment_acc", "all_topk_predictions"]
+               "scores_topk", "segment_acc", "all_topk_predictions", "first_matches"]
     # topk_keys = ["top-" + str(i) for i in all_matches.keys()]
     # columns.extend(topk_keys)
     wandb_table = wandb.Table(columns=columns, data=samples_table)
