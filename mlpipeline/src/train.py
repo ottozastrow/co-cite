@@ -135,10 +135,15 @@ def main():
     )
     wandb_callback = WandbCallback(save_model=not args.debug)
 
+    import tensorflow as tf
+    tb_log_dir = "tensorboard_logs/" + args.modelname + "_" + str(wandb.run.id) + "/"
+    tb_callback = tf.keras.callbacks.TensorBoard(log_dir=tb_log_dir)
+
     callbacks_list = [
         wandb_callback,
         metric_test_callback, 
         metric_train_callback,
+        tb_callback,
     ]
 
     if not args.debug:

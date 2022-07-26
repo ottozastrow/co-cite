@@ -17,17 +17,24 @@ def plot_precision_recall(prefix, matches, scores, top_ks, buckets=39) -> None:
 
     for k in top_ks:
         # for every threshold, compute the precision
+        
         precisions = []
-        for threshold in thresholds:
-            # compute the number of true positives
-            true_positives = np.sum(matches[k] & (scores >= threshold))
-            # compute the number of false positives
-            false_positives = np.sum(np.logical_not(
-                matches[k]) & (scores >= threshold))
-            # compute the precision
-            precision = true_positives / (true_positives + false_positives)
-            # append the precision to the list of precisions
-            precisions.append(precision)
+        if len(matches[k] > 0):
+            for threshold in thresholds:
+                # compute the number of true positives
+                # import pdb
+                # pdb.set_trace()
+                true_positives = np.sum(matches[k] & (scores >= threshold))
+                # compute the number of false positives
+                false_positives = np.sum(np.logical_not(
+                    matches[k]) & (scores >= threshold))
+                # compute the precision
+                precision = true_positives / (true_positives + false_positives)
+                # append the precision to the list of precisions
+                precisions.append(precision)
+        else:
+            precisions.append(None)
+    
 
         # plot curve
         # plt.legend(["top " + str(k)])

@@ -59,8 +59,9 @@ def generate_batch(model, inputs, args):
     if args.topk != 1:
         scores = list(scores.numpy())  # from tensor
         scores_top1 = [scores[i] for i in range(len(scores)) if i%args.topk == 0]
-        # convert to list of lists (batchsize x beams)
-        scores_topk = [scores[i::args.topk] for i in range(args.topk)]
+        # convert flattened list to list of list, by splitting every args.eval_batchsize
+        scores_topk = [scores[i:i+args.topk] for i in range(0, len(scores), args.topk)]
+
 
     else:
         # when args.topk == 1, predictions is a tuple of logits (tensor)
@@ -176,9 +177,11 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
             decoded_inputs, beams[0], decoded_labels, occurrences,
             scores_topk, mean_segment_accs, beams_reorderd
         ]
-        columns_list.extend(list(matches.values()))
+        # columns_list.extend(list(matches.values()))
         columns_list = list(columns_list)
         row = [list(t) for t in zip(*(columns_list))]
+        # import pdb
+        # pdb.set_trace()
         samples_table += row
         if counter % 25 == 0:
             log_metrics(metric_outputs, prefix + "_incremental")
@@ -188,8 +191,8 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
 
     columns = ["inputs", "top1 prediction", "label", "label_occurrences",
                "scores_topk", "segment_acc", "all_topk_predictions"]
-    topk_keys = ["top-" + str(i) for i in all_matches.keys()]
-    columns.extend(topk_keys)
+    # topk_keys = ["top-" + str(i) for i in all_matches.keys()]
+    # columns.extend(topk_keys)
     wandb_table = wandb.Table(columns=columns, data=samples_table)
     wandb.log({prefix + "demo": wandb_table})
 
@@ -197,6 +200,6 @@ def evaluate(model, dataset, prefix, args, top_ks, tokenizer):
     plots.plot_precision_recall(prefix, all_matches, np_all_scores, top_ks=top_ks)
 
     table = pd.DataFrame(samples_table, columns=columns)
-    plots.plot_accs_per_occurrence(prefix, table, columns=["segment_acc"] + topk_keys)
+    plots.plot_accs_per_occurrence(prefix, table, columns=["segment_acc"])
 
     return mean_metric_outputs
